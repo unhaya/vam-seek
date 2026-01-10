@@ -730,6 +730,8 @@
             // マニュアル移動フラグ（キーボード操作時の追従停止用）
             isManuallyMoved: false,
             manualMoveTimeout: null,
+            // スクロール判定用の前回の行
+            previousRow: -1,
             // アニメーション
             animationId: null,
             isAnimating: false,
@@ -1629,20 +1631,38 @@
             }
             STATE.manualMoveTimeout = setTimeout(() => {
                 STATE.isManuallyMoved = false;
+                // フラグ解除時に現在の行を同期してスクロールチェック
+                STATE.previousRow = Math.floor(STATE.targetY / STATE.cellHeight);
+                scrollToMarker();
             }, 500);
         }
 
         function scrollToMarker() {
             const container = elements.gridContainer;
-            const markerY = STATE.targetY;
-            const containerHeight = container.clientHeight;
-            const scrollTop = container.scrollTop;
+            const viewportHeight = container.clientHeight;
 
-            if (markerY < scrollTop + STATE.cellHeight) {
-                container.scrollTop = Math.max(0, markerY - STATE.cellHeight);
-            } else if (markerY > scrollTop + containerHeight - STATE.cellHeight * 2) {
-                container.scrollTop = markerY - containerHeight + STATE.cellHeight * 2;
+            if (STATE.cellHeight <= 0 || STATE.totalRows <= 0 || viewportHeight <= 0) {
+                return;
             }
+
+            // 現在の行を計算
+            const currentRow = Math.floor(STATE.targetY / STATE.cellHeight);
+
+            // ビューポートに表示可能な行数を計算
+            const visibleRows = viewportHeight / STATE.cellHeight;
+
+            // 行がビューポートの中央付近に来るようにスクロール
+            // オリジナルVAM準拠: target_row = max(0, row - visible_rows / 2)
+            const targetRow = Math.max(0, currentRow - visibleRows / 2);
+
+            // スクロール位置を計算
+            const targetScrollTop = targetRow * STATE.cellHeight;
+
+            // スムーズスクロール
+            container.scrollTo({
+                top: targetScrollTop,
+                behavior: 'smooth'
+            });
         }
 
         // ==================================================
@@ -1940,8 +1960,9 @@
 
                 // スクロール（行が変わった時のみ）
                 const newRow = Math.floor(STATE.targetY / STATE.cellHeight);
-                if (newRow !== Math.floor(STATE.markerY / STATE.cellHeight)) {
+                if (newRow !== STATE.previousRow) {
                     scrollToMarker();
+                    STATE.previousRow = newRow;
                 }
             }
 
