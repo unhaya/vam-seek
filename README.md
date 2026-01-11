@@ -53,6 +53,24 @@ That's it. See [docs/INTEGRATION.md](docs/INTEGRATION.md) for full documentation
 - **VAM algorithm** - Precise timestamp calculation
 - **Framework support** - React, Vue, vanilla JS examples included
 
+## Privacy & Architecture
+
+**Your video never leaves the browser.**
+
+Traditional thumbnail systems upload videos to a server, process with FFmpeg, store thumbnails, and serve via CDN. This costs money, takes time, and raises privacy concerns.
+
+VAM Seek works differently:
+
+| Traditional | VAM Seek |
+|-------------|----------|
+| Video uploaded to server | Video stays in browser |
+| Server-side FFmpeg processing | Client-side Canvas API |
+| Thumbnails stored on disk | Frames cached in memory |
+| CDN bandwidth costs | Zero server cost |
+| Privacy risk | Fully private |
+
+All frame extraction happens in the user's browser using the Canvas API. When the page closes, everything is gone. No data is ever sent to any server.
+
 ## Directory Structure
 
 ```
