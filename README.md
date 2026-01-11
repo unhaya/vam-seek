@@ -73,7 +73,11 @@ All frame extraction happens in the user's browser using the Canvas API. When th
 
 ## Why 2D Grid Seek?
 
-**This is not a new feature. It's a missing standard.**
+**Long videos are no longer watched from start to finish.**
+
+We search. We go back. We verify.
+
+The UI for this just didn't exist.
 
 ### The Reality of Video Watching
 
