@@ -115,6 +115,10 @@ Good UI has these properties:
 
 VAM Seek satisfies all four. Once you use it, going back feels incomplete.
 
+---
+
+> **Note:** This UI is based on a design concept I call **"Grid Seek Marker"** — a time-exploration interface where video becomes a 2D navigable space. VAM Seek is the implementation; Grid Seek Marker is the idea.
+
 ## Directory Structure
 
 ```
