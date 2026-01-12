@@ -1022,18 +1022,20 @@
             try {
                 console.log(`[generateThumbnails] グリッド生成開始: ${targetVideoUrl}`);
 
-                // フレーム抽出処理が残っていたら中断して待機
-                STATE.aborted = true;
-                let waitCount = 0;
-                while (STATE.isExtracting && waitCount < 50) {
-                    await new Promise(r => setTimeout(r, 10));
-                    waitCount++;
-                }
-
-                // 強制的にフラグをリセット（念のため）
+                // フレーム抽出処理が残っていたら待機（abortedは設定しない）
                 if (STATE.isExtracting) {
-                    console.warn('[generateThumbnails] 強制的にisExtractingをリセット');
-                    STATE.isExtracting = false;
+                    console.log('[generateThumbnails] 前回のフレーム抽出完了待ち...');
+                    let waitCount = 0;
+                    while (STATE.isExtracting && waitCount < 50) {
+                        await new Promise(r => setTimeout(r, 10));
+                        waitCount++;
+                    }
+
+                    // 強制的にフラグをリセット（念のため）
+                    if (STATE.isExtracting) {
+                        console.warn('[generateThumbnails] 強制的にisExtractingをリセット');
+                        STATE.isExtracting = false;
+                    }
                 }
 
                 // 【動画切り替え検知】この時点で既に別の動画に切り替わっていたら中止
@@ -1270,7 +1272,7 @@
                 pollInterval = setInterval(() => {
                     checkCount++;
 
-                    // 動画が切り替わったら即座に中止
+                    // 動画が切り替わったら即座に中止（これだけで十分）
                     if (STATE.currentVideoUrl !== url) {
                         if (!resolved) {
                             resolved = true;
@@ -1278,19 +1280,6 @@
                             cleanup();
                             video.remove();
                             console.log('[createExtractorVideo] 動画切り替え検知（静かに中止）');
-                            resolve(null);
-                        }
-                        return;
-                    }
-
-                    // abortフラグが立ったら中止
-                    if (STATE.aborted) {
-                        if (!resolved) {
-                            resolved = true;
-                            clearInterval(pollInterval);
-                            cleanup();
-                            video.remove();
-                            console.log('[createExtractorVideo] abort検知（静かに中止）');
                             resolve(null);
                         }
                         return;
