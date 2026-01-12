@@ -372,7 +372,8 @@
                 for (let i = 0; i < this.state.totalCells; i++) {
                     if (this.state.aborted) break;
 
-                    const timestamp = i * this.secondsPerCell;
+                    // Extract thumbnail from center of cell (0.5 offset)
+                    const timestamp = (i + 0.5) * this.secondsPerCell;
                     const cell = this.grid.children[i];
                     if (!cell) continue;
 
