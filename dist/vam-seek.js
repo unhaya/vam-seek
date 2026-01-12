@@ -191,6 +191,9 @@
             // ② Reset scroll position to top
             this.container.scrollTop = 0;
 
+            // ③ Seek to center of first cell (0.5 cell offset)
+            this.seekTo(0.5 * this.secondsPerCell);
+
             this._extractAllFrames();
         }
 
