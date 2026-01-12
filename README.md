@@ -48,7 +48,8 @@ That's it. See [docs/INTEGRATION.md](docs/INTEGRATION.md) for full documentation
 ## Features
 
 - **Client-side frame extraction** - No server CPU usage
-- **LRU cache** - 200 frames cached in memory
+- **Multi-video LRU cache** - Intelligent caching for up to 3 videos (200 frames each)
+- **Race condition prevention** - Safe video switching without loading freezes
 - **Smooth marker animation** - 60fps with requestAnimationFrame
 - **VAM algorithm** - Precise timestamp calculation
 - **Framework support** - React, Vue, vanilla JS examples included
@@ -252,9 +253,36 @@ video.addEventListener('seeked', () => {
   const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
 });
 
-// 4. Cache with LRU (max 200 frames)
-frameCache.put(videoSrc, timestamp, dataUrl);
+// 4. Cache with LRU (max 200 frames per video)
+frameCache.put(timestamp, dataUrl);
 ```
+
+### Multi-Video LRU Cache (2025-01-13)
+
+```javascript
+class FrameCache {
+  constructor(maxFramesPerVideo = 200, maxVideos = 3) {
+    this.caches = new Map(); // videoUrl -> Map(timestamp -> dataUrl)
+  }
+
+  setCurrentVideo(videoUrl) {
+    // LRU: Move existing video to end, or create new cache
+    if (this.caches.size >= this.maxVideos) {
+      // Delete oldest video (first entry)
+      const oldestUrl = this.caches.keys().next().value;
+      this.caches.delete(oldestUrl);
+    }
+  }
+}
+
+// Usage: Keeps last 3 videos cached (600 frames total = ~3-6MB)
+const frameCache = new FrameCache(200, 3);
+```
+
+**Benefits:**
+- Switch between videos without re-extracting frames
+- Automatic memory management (oldest video auto-deleted)
+- No race conditions when rapidly switching videos
 
 ### VAM Algorithm
 
@@ -292,20 +320,28 @@ Commercial use requires a paid license. Contact: info@haasiy.jp
 
 ## Development History
 
-### 2025-01-10: Initial Release
+### 2025-01-13: Multi-Video Cache System
 
-- FastAPI backend with modular architecture
-- Client-side frame extraction (video + canvas)
-- VAM-compliant marker movement (X-continuous mode)
-- LRU cache with fade-in animation
-- Scroll position fix
-- Same-origin serving for CORS
+- **LRU video-aware cache** - Manages up to 3 videos intelligently
+- **Race condition fix** - Prevents loading freeze when rapidly switching videos
+- **Memory optimization** - Automatic oldest-video eviction (3-6MB max)
+- **Process abort mechanism** - Clean interruption of frame extraction
+- **Debug logging** - Console logs for cache hits, video switches, extraction progress
 
 ### 2025-01-10: Library Release
 
 - Standalone `vam-seek.js` for external integration
 - Integration documentation
 - React, Vue examples
+
+### 2025-01-10: Initial Release
+
+- FastAPI backend with modular architecture
+- Client-side frame extraction (video + canvas)
+- VAM-compliant marker movement (X-continuous mode)
+- LRU frame cache with fade-in animation
+- Scroll position fix
+- Same-origin serving for CORS
 
 ## Credits
 

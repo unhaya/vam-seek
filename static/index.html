@@ -709,35 +709,131 @@
             aborted: false
         };
 
-        // LRU Cache
+        // LRU Cache (Video-aware)
+        // [2025-01-13] 動画単位でキャッシュ管理 + LRU方式で最大N本の動画を保持
         class FrameCache {
-            constructor(maxSize = 200) {
-                this.cache = new Map();
-                this.maxSize = maxSize;
+            constructor(maxFramesPerVideo = 200, maxVideos = 3) {
+                this.caches = new Map(); // videoUrl -> Map(timestamp -> dataUrl)
+                this.maxFramesPerVideo = maxFramesPerVideo;
+                this.maxVideos = maxVideos;
+                this.currentVideoUrl = null;
             }
-            _key(src, ts) { return `${src}@${ts.toFixed(2)}`; }
-            get(src, ts) {
-                const k = this._key(src, ts);
-                if (!this.cache.has(k)) return null;
-                const v = this.cache.get(k);
-                this.cache.delete(k);
-                this.cache.set(k, v);
-                return v;
-            }
-            put(src, ts, data) {
-                const k = this._key(src, ts);
-                if (this.cache.has(k)) this.cache.delete(k);
-                else if (this.cache.size >= this.maxSize) {
-                    const first = this.cache.keys().next().value;
-                    this.cache.delete(first);
+
+            /**
+             * 現在の動画を設定（動画切り替え時に呼ぶ）
+             * LRU方式: 既存動画なら最新に移動、新規動画なら古い動画を削除
+             */
+            setCurrentVideo(videoUrl) {
+                if (!videoUrl) return;
+
+                const videoShortName = videoUrl.substring(videoUrl.lastIndexOf('/') + 1, videoUrl.lastIndexOf('/') + 20);
+
+                this.currentVideoUrl = videoUrl;
+
+                // 既存の動画なら最新に移動（LRU）
+                if (this.caches.has(videoUrl)) {
+                    const cache = this.caches.get(videoUrl);
+                    this.caches.delete(videoUrl);
+                    this.caches.set(videoUrl, cache);
+                    console.log(`[FrameCache] 動画切り替え (既存): ${videoShortName}... (${cache.size}フレームキャッシュ済み)`);
+                    return;
                 }
-                this.cache.set(k, data);
+
+                // 新規動画: 上限チェック
+                if (this.caches.size >= this.maxVideos) {
+                    // 最も古い動画（最初のエントリ）を削除
+                    const oldestUrl = this.caches.keys().next().value;
+                    const oldestShortName = oldestUrl.substring(oldestUrl.lastIndexOf('/') + 1, oldestUrl.lastIndexOf('/') + 20);
+                    this.caches.delete(oldestUrl);
+                    console.log(`[FrameCache] LRU削除: ${oldestShortName}...`);
+                }
+
+                // 新しい動画用のキャッシュを作成
+                this.caches.set(videoUrl, new Map());
+                console.log(`[FrameCache] 動画切り替え (新規): ${videoShortName}... (キャッシュ数: ${this.caches.size}/${this.maxVideos})`);
             }
-            clear() { this.cache.clear(); }
-            get size() { return this.cache.size; }
+
+            /**
+             * フレームを取得（LRU更新）
+             */
+            get(ts) {
+                if (!this.currentVideoUrl) return null;
+
+                const cache = this.caches.get(this.currentVideoUrl);
+                if (!cache) return null;
+
+                const key = ts.toFixed(2);
+                if (!cache.has(key)) return null;
+
+                // LRU: 最新に移動
+                const value = cache.get(key);
+                cache.delete(key);
+                cache.set(key, value);
+                return value;
+            }
+
+            /**
+             * フレームを保存（LRU、サイズ制限あり）
+             */
+            put(ts, data) {
+                if (!this.currentVideoUrl || !data) return;
+
+                const cache = this.caches.get(this.currentVideoUrl);
+                if (!cache) return;
+
+                const key = ts.toFixed(2);
+
+                // 既存キーなら削除して最新に
+                if (cache.has(key)) {
+                    cache.delete(key);
+                } else if (cache.size >= this.maxFramesPerVideo) {
+                    // サイズ上限: 最古のフレームを削除
+                    const oldestKey = cache.keys().next().value;
+                    cache.delete(oldestKey);
+                }
+
+                cache.set(key, data);
+            }
+
+            /**
+             * 現在の動画のキャッシュをクリア
+             */
+            clearCurrentVideo() {
+                if (this.currentVideoUrl && this.caches.has(this.currentVideoUrl)) {
+                    this.caches.delete(this.currentVideoUrl);
+                }
+            }
+
+            /**
+             * 全動画のキャッシュをクリア
+             */
+            clearAll() {
+                this.caches.clear();
+                this.currentVideoUrl = null;
+            }
+
+            /**
+             * デバッグ情報
+             */
+            getStats() {
+                const stats = {
+                    totalVideos: this.caches.size,
+                    currentVideo: this.currentVideoUrl,
+                    videos: []
+                };
+
+                for (const [url, cache] of this.caches.entries()) {
+                    stats.videos.push({
+                        url: url.substring(0, 50) + '...',
+                        frames: cache.size
+                    });
+                }
+
+                return stats;
+            }
         }
 
-        const frameCache = new FrameCache(200);
+        const frameCache = new FrameCache(200, 3);
 
         // DOM Elements
         const $ = id => document.getElementById(id);
@@ -838,23 +934,40 @@
             });
         }
 
+        // [2025-01-13] 動画切り替え時: 処理中断 + LRUキャッシュ更新
         function selectVideo(id) {
             const video = STATE.videos.find(v => v.id === id);
             if (!video) return;
 
+            // 既に同じ動画が選択されていたら何もしない
+            if (STATE.currentVideoUrl === video.url) return;
+
+            console.log(`[selectVideo] 動画切り替え: ${video.name}`);
+
+            // 進行中のフレーム抽出処理を中断
+            STATE.aborted = true;
+
+            // 新しい動画URLを設定
             STATE.currentVideoUrl = video.url;
+
+            // FrameCacheに現在の動画を通知（LRU更新）
+            frameCache.setCurrentVideo(video.url);
+
+            // 動画プレイヤーを更新
             elements.videoPlayer.src = video.url;
             elements.videoPlayer.classList.add('visible');
             elements.playerPlaceholder.style.display = 'none';
             elements.playBtn.disabled = false;
             elements.regenerateBtn.disabled = false;
 
+            // メタデータ読み込み完了後にサムネイル生成開始
             elements.videoPlayer.addEventListener('loadedmetadata', () => {
                 CONFIG.videoDuration = elements.videoPlayer.duration;
                 elements.totalTime.textContent = formatTime(CONFIG.videoDuration);
                 generateThumbnails();
             }, { once: true });
 
+            // 動画リストの選択状態を更新
             renderVideoList();
         }
 
@@ -862,12 +975,27 @@
         // Thumbnail Generation (Full Client-side Processing)
         // ==================================================
 
+        // [2025-01-13] グリッド生成: 前回の処理を確実に中断してから開始
         async function generateThumbnails() {
             if (!STATE.currentVideoUrl) return;
 
+            // 前回の処理を中断（あれば）
             STATE.aborted = true;
-            await new Promise(r => setTimeout(r, 50));
 
+            // 処理が完全に停止するまで待機（isExtractingフラグが解放されるまで）
+            let waitCount = 0;
+            while (STATE.isExtracting && waitCount < 50) {
+                await new Promise(r => setTimeout(r, 10));
+                waitCount++;
+            }
+
+            // 強制的にフラグをリセット（念のため）
+            if (STATE.isExtracting) {
+                console.warn('[generateThumbnails] 強制的にisExtractingをリセット');
+                STATE.isExtracting = false;
+            }
+
+            // グリッド設定を取得
             CONFIG.columns = parseInt(elements.columnsSelect.value);
             CONFIG.secondsPerCell = parseInt(elements.intervalSelect.value);
 
@@ -884,9 +1012,11 @@
 
             elements.gridSizeDisplay.textContent = `${CONFIG.columns}×${STATE.totalRows}`;
 
+            // グリッドを再生成
             renderGrid();
             hideLoading();
 
+            // マーカー初期化とフレーム抽出開始
             requestAnimationFrame(() => {
                 updateGridDimensions();
                 initializeMarker();
@@ -923,45 +1053,83 @@
         // Frame Extraction
         // ==================================================
 
+        // [2025-01-13] 動画URL単位で処理を管理し、動画切り替え時に確実に中断
         async function extractAllFrames() {
-            if (!STATE.currentVideoUrl || STATE.isExtracting) return;
+            if (!STATE.currentVideoUrl) return;
+
+            // 既に処理中なら何もしない（競合防止）
+            if (STATE.isExtracting) return;
 
             STATE.isExtracting = true;
             STATE.aborted = false;
 
+            // この処理が対象とする動画URLを記憶（処理中に切り替わったか検出するため）
+            const targetVideoUrl = STATE.currentVideoUrl;
+            console.log(`[extractAllFrames] 開始: ${STATE.totalCells}フレーム抽出`);
+
             try {
+                // 古い抽出用video要素を削除
                 if (STATE.frameExtractorVideo) {
                     STATE.frameExtractorVideo.remove();
+                    STATE.frameExtractorVideo = null;
                 }
 
-                STATE.frameExtractorVideo = await createExtractorVideo(STATE.currentVideoUrl);
+                // 新しい抽出用video要素を作成
+                STATE.frameExtractorVideo = await createExtractorVideo(targetVideoUrl);
 
                 for (let i = 0; i < STATE.totalCells; i++) {
-                    if (STATE.aborted) break;
+                    // 中断条件1: abortedフラグ
+                    if (STATE.aborted) {
+                        console.log(`[extractAllFrames] 中断 (aborted): ${i}/${STATE.totalCells}フレーム完了`);
+                        break;
+                    }
+
+                    // 中断条件2: 動画が切り替わった（重要！）
+                    if (STATE.currentVideoUrl !== targetVideoUrl) {
+                        console.log(`[extractAllFrames] 中断 (動画切り替え): ${i}/${STATE.totalCells}フレーム完了`);
+                        break;
+                    }
 
                     // Extract thumbnail from center of cell (0.5 offset)
                     const timestamp = (i + 0.5) * CONFIG.secondsPerCell;
                     const cell = elements.thumbnailGrid.children[i];
                     if (!cell) continue;
 
-                    const cached = frameCache.get(STATE.currentVideoUrl, timestamp);
+                    // キャッシュチェック
+                    const cached = frameCache.get(timestamp);
                     if (cached) {
                         displayFrame(cell, cached);
                         continue;
                     }
 
+                    // フレーム抽出
                     const frame = await extractFrame(STATE.frameExtractorVideo, timestamp);
-                    if (frame && !STATE.aborted) {
-                        frameCache.put(STATE.currentVideoUrl, timestamp, frame);
+
+                    // 抽出完了後、再度中断チェック（動画切り替わりやabortを検出）
+                    if (frame && !STATE.aborted && STATE.currentVideoUrl === targetVideoUrl) {
+                        frameCache.put(timestamp, frame);
                         displayFrame(cell, frame);
                     }
 
+                    // CPU負荷軽減のため短時間待機
                     await new Promise(r => setTimeout(r, 5));
+                }
+
+                // 正常完了
+                if (!STATE.aborted && STATE.currentVideoUrl === targetVideoUrl) {
+                    console.log(`[extractAllFrames] 完了: ${STATE.totalCells}/${STATE.totalCells}フレーム`);
                 }
             } catch (e) {
                 // Frame extraction error - silently fail
+                console.error('[extractAllFrames] Error:', e);
             } finally {
                 STATE.isExtracting = false;
+
+                // 抽出用video要素をクリーンアップ
+                if (STATE.frameExtractorVideo) {
+                    STATE.frameExtractorVideo.remove();
+                    STATE.frameExtractorVideo = null;
+                }
             }
         }
 
