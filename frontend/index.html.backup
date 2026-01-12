@@ -1,0 +1,1983 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAM Web - 2Dシークマーカー</title>
+    <style>
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d30;
+            --border-color: #3c3c3c;
+            --accent: #0e639c;
+            --highlight: #e94560;
+            --text: #cccccc;
+            --text-dim: #808080;
+            --marker-glow: rgba(233, 69, 96, 0.6);
+            --success: #4caf50;
+            --warning: #ffc107;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ==================== レイアウト ==================== */
+        .app-container {
+            display: flex;
+            height: calc(100vh - 24px);
+            width: 100vw;
+        }
+
+        /* ツリービュー（左パネル） */
+        .tree-panel {
+            width: 280px;
+            min-width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease;
+            overflow: hidden;
+        }
+
+        .tree-panel.collapsed {
+            width: 0;
+            min-width: 0;
+            opacity: 0;
+            border-right: none;
+        }
+
+        .tree-header {
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tree-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 0;
+        }
+
+        /* アップロードエリア */
+        .upload-area {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .upload-dropzone {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-dropzone:hover,
+        .upload-dropzone.dragover {
+            border-color: var(--accent);
+            background: rgba(14, 99, 156, 0.1);
+        }
+
+        .upload-dropzone.uploading {
+            border-color: var(--warning);
+            background: rgba(255, 193, 7, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .upload-text {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .upload-progress {
+            margin-top: 8px;
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .upload-progress.visible {
+            display: block;
+        }
+
+        .upload-progress-bar {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .video-list {
+            padding: 8px 0;
+        }
+
+        .video-item {
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-left: 3px solid transparent;
+        }
+
+        .video-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .video-item.selected {
+            background: var(--accent);
+            border-left-color: var(--highlight);
+        }
+
+        .video-item-icon {
+            font-size: 16px;
+        }
+
+        .video-item-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .video-item-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .video-item-duration {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        /* メインエリア */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* プレイヤーエリア（中央） */
+        .player-area {
+            flex: 1;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .player-placeholder {
+            color: var(--text-dim);
+            font-size: 14px;
+            text-align: center;
+        }
+
+        #videoPlayer {
+            max-width: 100%;
+            max-height: 100%;
+            display: none;
+        }
+
+        #videoPlayer.visible {
+            display: block;
+        }
+
+        /* コントロールバー */
+        .control-bar {
+            height: 40px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            gap: 12px;
+        }
+
+        .control-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text);
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .control-btn:hover {
+            background: var(--accent);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .time-display {
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            color: var(--text);
+            min-width: 140px;
+        }
+
+        .time-highlight {
+            color: var(--highlight);
+            font-weight: bold;
+        }
+
+        /* グリッドパネル（右側） */
+        .grid-panel {
+            width: 400px;
+            min-width: 300px;
+            max-width: 600px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .grid-header {
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .grid-settings {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .grid-setting-label {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .grid-setting-input {
+            width: 50px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text);
+            padding: 2px 4px;
+            font-size: 11px;
+            border-radius: 2px;
+        }
+
+        .grid-setting-select {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text);
+            padding: 2px 6px;
+            font-size: 11px;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .grid-setting-select:hover {
+            border-color: var(--accent);
+        }
+
+        .grid-info {
+            color: var(--text-dim);
+        }
+
+        /* グリッドコンテナ */
+        .grid-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        .grid-scroll-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        /* グリッド本体 */
+        .thumbnail-grid {
+            display: grid;
+            gap: 1px;
+            background: var(--border-color);
+            width: 100%;
+        }
+
+        .grid-cell {
+            aspect-ratio: 16/9;
+            background: var(--bg-tertiary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .grid-cell img,
+        .grid-cell canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        /* フェードインアニメーション */
+        .grid-cell canvas {
+            opacity: 0;
+            transition: opacity 0.4s ease-in-out;
+        }
+
+        .grid-cell canvas.loaded {
+            opacity: 1;
+        }
+
+        .grid-cell.placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        /* ローディングスピナー（セル用） */
+        .grid-cell .cell-loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .grid-cell.frame-loaded .cell-loader {
+            display: none;
+        }
+
+        .grid-cell .cell-time {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            background: rgba(0,0,0,0.7);
+            padding: 1px 4px;
+            font-size: 9px;
+            border-radius: 2px;
+            pointer-events: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* グリッド全体の選択防止 */
+        .thumbnail-grid {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* SVGマーカー（VAM準拠：滑らかに連続移動） */
+        .svg-marker {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 50;
+            display: none;  /* 初期非表示、JSでblock化 */
+            /* アニメーションはJSで制御（transformで滑らかに移動） */
+            will-change: transform;
+            filter: drop-shadow(0 0 6px rgba(183, 57, 43, 0.8)) drop-shadow(0 0 12px rgba(183, 57, 43, 0.5));
+        }
+
+        /* マーカーサイズ（セルの32%がデフォルト） */
+        .svg-marker img {
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* 現在セルハイライト（オプション：非表示にも可能） */
+        .current-cell-highlight {
+            position: absolute;
+            border: 2px solid var(--highlight);
+            box-shadow: inset 0 0 20px rgba(233, 69, 96, 0.3);
+            pointer-events: none;
+            z-index: 40;
+            opacity: 0.5;
+            display: none; /* マーカーがあるので非表示 */
+        }
+
+        /* ステータスバー */
+        .status-bar {
+            height: 24px;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            font-size: 11px;
+            gap: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-key {
+            background: rgba(255,255,255,0.2);
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-family: monospace;
+        }
+
+        /* 情報オーバーレイ */
+        .info-overlay {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
+            z-index: 60;
+            pointer-events: none;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 2px;
+        }
+
+        .info-label {
+            color: var(--text-dim);
+        }
+
+        .info-value {
+            color: var(--highlight);
+            font-weight: bold;
+        }
+
+        /* ローディング */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .loading-overlay.visible {
+            display: flex;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--highlight);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* スクロールバー */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4a4a4a;
+        }
+
+        /* ファイル入力を隠す */
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 左: ツリービュー -->
+        <div class="tree-panel" id="treePanel">
+            <div class="tree-header">
+                <span>動画一覧</span>
+                <span style="color: var(--text-dim)">T で非表示</span>
+            </div>
+            <div class="upload-area">
+                <div class="upload-dropzone" id="uploadDropzone">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">
+                        動画ファイルをドロップ<br>
+                        またはクリックして選択
+                    </div>
+                    <div class="upload-progress" id="uploadProgress">
+                        <div class="upload-progress-bar" id="uploadProgressBar"></div>
+                    </div>
+                </div>
+                <input type="file" id="fileInput" accept="video/*">
+            </div>
+            <div class="tree-content">
+                <div class="video-list" id="videoList">
+                    <!-- 動画リスト -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 中央: メインエリア -->
+        <div class="main-area">
+            <div class="player-area" id="playerArea">
+                <div class="player-placeholder" id="playerPlaceholder">
+                    動画ファイルをアップロードしてください<br>
+                    <small>MP4, WebM, MKV, AVI, MOV 対応</small>
+                </div>
+                <video id="videoPlayer" controls></video>
+            </div>
+            <div class="control-bar">
+                <button type="button" class="control-btn" id="playBtn" disabled>▶ 再生</button>
+                <div class="time-display">
+                    <span class="time-highlight" id="currentTime">00:00.00</span>
+                    <span> / </span>
+                    <span id="totalTime">00:00.00</span>
+                </div>
+                <div style="flex:1"></div>
+                <div style="font-size: 12px; color: var(--text-dim)">
+                    グリッド: <span id="gridSizeDisplay">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右: グリッドパネル -->
+        <div class="grid-panel" id="gridPanel">
+            <div class="grid-header">
+                <span>サムネイルグリッド</span>
+                <div class="grid-settings">
+                    <span class="grid-setting-label">列:</span>
+                    <select class="grid-setting-select" id="columnsSelect" title="列数">
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5" selected>5</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                        <option value="10">10</option>
+                    </select>
+                    <span class="grid-setting-label">秒/セル:</span>
+                    <select class="grid-setting-select" id="intervalSelect" title="秒/セル">
+                        <option value="5">5s</option>
+                        <option value="10">10s</option>
+                        <option value="15" selected>15s</option>
+                        <option value="30">30s</option>
+                        <option value="60">1m</option>
+                        <option value="120">2m</option>
+                        <option value="300">5m</option>
+                    </select>
+                    <button type="button" class="control-btn" id="regenerateBtn" disabled>生成</button>
+                </div>
+            </div>
+            <div class="grid-container" id="gridContainer">
+                <div class="grid-scroll-wrapper" id="gridScrollWrapper">
+                    <div class="thumbnail-grid" id="thumbnailGrid"></div>
+                    <!-- SVGマーカー（VAM準拠：滑らかに連続移動） -->
+                    <div class="svg-marker" id="svgMarker">
+                        <img src="assets/marker.svg" alt="marker" draggable="false">
+                    </div>
+                    <div class="current-cell-highlight" id="cellHighlight"></div>
+                </div>
+                <div class="info-overlay" id="infoOverlay">
+                    <div class="info-row">
+                        <span class="info-label">時間:</span>
+                        <span class="info-value" id="overlayTime">00:00.00</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">セル:</span>
+                        <span class="info-value" id="overlayCell">(0, 0)</span>
+                    </div>
+                </div>
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="spinner"></div>
+                    <div id="loadingText">サムネイル生成中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ステータスバー -->
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-key">T</span> ツリー表示切替
+        </div>
+        <div class="status-item">
+            <span class="status-key">↑↓←→</span> マーカー移動
+        </div>
+        <div class="status-item">
+            <span class="status-key">Space</span> 再生/停止
+        </div>
+        <div class="status-item">
+            <span class="status-key">クリック</span> シーク
+        </div>
+        <div style="flex:1"></div>
+        <div class="status-item" id="apiStatus">API: 接続中...</div>
+    </div>
+
+    <script>
+        // ==================================================
+        // VAM Web - 2Dシークマーカー (動画対応版)
+        // ==================================================
+
+        // 同一オリジンからアクセス（CORS問題を回避）
+        // バックエンドから直接index.htmlを配信する場合は空文字列
+        const API_BASE = '';
+
+        // VAM準拠のプリセット値
+        const INTERVAL_PRESETS = [
+            { value: 5, label: "5s" },
+            { value: 10, label: "10s" },
+            { value: 15, label: "15s" },   // デフォルト
+            { value: 30, label: "30s" },
+            { value: 60, label: "1m" },
+            { value: 120, label: "2m" },
+            { value: 300, label: "5m" }
+        ];
+
+        const COLUMN_PRESETS = [3, 4, 5, 6, 8, 10];  // デフォルト: 5
+
+        // 設定
+        const CONFIG = {
+            columns: 5,
+            secondsPerCell: 15,
+            videoDuration: 0,
+            thumbWidth: 160,
+            thumbHeight: 90
+        };
+
+        // 状態
+        const STATE = {
+            // マーカー位置（ピクセル座標）- VAM準拠の滑らかな移動用
+            markerX: 0,           // 現在のX座標（ピクセル）
+            markerY: 0,           // 現在のY座標（ピクセル）
+            targetX: 0,           // 目標X座標（アニメーション用）
+            targetY: 0,           // 目標Y座標（アニメーション用）
+            // 相対座標（0.0-1.0）- 時刻計算用
+            currentRelX: 0,
+            currentRelY: 0,
+            // セル座標（整数）- 表示用
+            currentCellX: 0,
+            currentCellY: 0,
+            totalRows: 0,
+            totalCells: 0,
+            // グリッドサイズ（ピクセル）
+            gridWidth: 0,
+            gridHeight: 0,
+            cellWidth: 0,
+            cellHeight: 0,
+            // マーカーサイズ
+            markerSize: 40,
+            // ドラッグ状態
+            isDragging: false,
+            // マニュアル移動フラグ（キーボード操作時の追従停止用）
+            isManuallyMoved: false,
+            manualMoveTimeout: null,
+            // アニメーション
+            animationId: null,
+            isAnimating: false,
+            // 接続状態
+            isApiConnected: false,
+            currentVideoId: null,
+            videos: [],
+            // フレーム抽出用
+            frameExtractorVideo: null,
+            isExtractingFrames: false,
+            extractionAborted: false
+        };
+
+        // ==================================================
+        // LRUフレームキャッシュ（VAM準拠：メモリ上に保持）
+        // ==================================================
+
+        class FrameCache {
+            constructor(maxSize = 200) {
+                this.cache = new Map();
+                this.maxSize = maxSize;
+            }
+
+            // キーを生成（動画URL + タイムスタンプ）
+            makeKey(videoSrc, timestamp) {
+                return `${videoSrc}:${timestamp.toFixed(2)}`;
+            }
+
+            get(videoSrc, timestamp) {
+                const key = this.makeKey(videoSrc, timestamp);
+                if (this.cache.has(key)) {
+                    // LRU: 最近使用したものを最後に移動
+                    const value = this.cache.get(key);
+                    this.cache.delete(key);
+                    this.cache.set(key, value);
+                    return value;
+                }
+                return null;
+            }
+
+            put(videoSrc, timestamp, imageData) {
+                const key = this.makeKey(videoSrc, timestamp);
+
+                // 既存なら削除して再追加（LRU更新）
+                if (this.cache.has(key)) {
+                    this.cache.delete(key);
+                }
+
+                // サイズ制限チェック
+                while (this.cache.size >= this.maxSize) {
+                    // 最古のアイテムを削除
+                    const oldestKey = this.cache.keys().next().value;
+                    this.cache.delete(oldestKey);
+                }
+
+                this.cache.set(key, imageData);
+            }
+
+            clear() {
+                this.cache.clear();
+            }
+
+            get size() {
+                return this.cache.size;
+            }
+        }
+
+        const frameCache = new FrameCache(200);
+
+        // ==================================================
+        // フレーム抽出（video + canvas でリアルタイムキャプチャ）
+        // ==================================================
+
+        /**
+         * 非表示のvideo要素からフレームをキャプチャ
+         * @param {HTMLVideoElement} video - フレーム抽出用のvideo要素
+         * @param {number} timestamp - キャプチャする時刻（秒）
+         * @returns {Promise<ImageData|null>} - キャプチャした画像データ
+         */
+        async function extractFrame(video, timestamp) {
+            return new Promise((resolve) => {
+                // キャッシュチェック
+                const cached = frameCache.get(video.src, timestamp);
+                if (cached) {
+                    resolve(cached);
+                    return;
+                }
+
+                // 既にその時刻にいる場合は即座にキャプチャ
+                if (Math.abs(video.currentTime - timestamp) < 0.1) {
+                    const imageData = captureVideoFrame(video);
+                    if (imageData) {
+                        frameCache.put(video.src, timestamp, imageData);
+                    }
+                    resolve(imageData);
+                    return;
+                }
+
+                // シーク完了を待ってキャプチャ
+                const onSeeked = () => {
+                    video.removeEventListener('seeked', onSeeked);
+                    const imageData = captureVideoFrame(video);
+                    if (imageData) {
+                        frameCache.put(video.src, timestamp, imageData);
+                    }
+                    resolve(imageData);
+                };
+
+                video.addEventListener('seeked', onSeeked);
+                video.currentTime = timestamp;
+
+                // タイムアウト（3秒）
+                setTimeout(() => {
+                    video.removeEventListener('seeked', onSeeked);
+                    resolve(null);
+                }, 3000);
+            });
+        }
+
+        /**
+         * videoからcanvasにフレームをキャプチャ
+         * @param {HTMLVideoElement} video
+         * @returns {ImageData|null}
+         */
+        function captureVideoFrame(video) {
+            console.log('captureVideoFrame - readyState:', video.readyState, 'currentTime:', video.currentTime);
+            if (video.readyState < 2) {
+                console.warn('Video not ready, readyState:', video.readyState);
+                return null;
+            }
+
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = CONFIG.thumbWidth;
+                canvas.height = CONFIG.thumbHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                console.log('Frame captured, dataUrl length:', dataUrl.length);
+
+                return {
+                    dataUrl: dataUrl,
+                    width: canvas.width,
+                    height: canvas.height
+                };
+            } catch (e) {
+                console.error('captureVideoFrame error:', e);
+                return null;
+            }
+        }
+
+        /**
+         * フレーム抽出用のvideo要素を作成
+         * @param {string} videoUrl
+         * @returns {Promise<HTMLVideoElement>}
+         */
+        function createExtractorVideo(videoUrl) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.style.display = 'none';
+                video.muted = true;
+                video.preload = 'auto';
+                // crossOriginはローカル環境では不要（CORSエラーの原因になる）
+                // video.crossOrigin = 'anonymous';
+
+                video.addEventListener('loadeddata', () => {
+                    console.log('Extractor video loaded:', videoUrl);
+                    resolve(video);
+                });
+
+                video.addEventListener('error', (e) => {
+                    console.error('Video load error:', e);
+                    reject(new Error('Video load failed'));
+                });
+
+                video.src = videoUrl;
+                document.body.appendChild(video);
+            });
+        }
+
+        /**
+         * グリッド全体のフレームを順次抽出（プログレッシブ表示）
+         */
+        async function extractAllFrames() {
+            if (!STATE.currentVideoId || STATE.isExtractingFrames) return;
+
+            console.log('extractAllFrames started');
+            STATE.isExtractingFrames = true;
+            STATE.extractionAborted = false;
+
+            const video = STATE.videos.find(v => v.video_id === STATE.currentVideoId);
+            if (!video) {
+                console.error('Video not found:', STATE.currentVideoId);
+                STATE.isExtractingFrames = false;
+                return;
+            }
+
+            try {
+                // フレーム抽出用video要素を作成
+                if (STATE.frameExtractorVideo) {
+                    STATE.frameExtractorVideo.remove();
+                }
+                const videoUrl = `${API_BASE}${video.video_url}`;
+                console.log('Creating extractor video:', videoUrl);
+                STATE.frameExtractorVideo = await createExtractorVideo(videoUrl);
+
+                console.log('Extracting frames, total cells:', STATE.totalCells);
+
+                // セルを順番に処理
+                for (let i = 0; i < STATE.totalCells; i++) {
+                    if (STATE.extractionAborted) break;
+
+                    const timestamp = i * CONFIG.secondsPerCell;
+                    const cell = elements.thumbnailGrid.children[i];
+                    if (!cell) continue;
+
+                    // 既にキャッシュにあればスキップ
+                    const cached = frameCache.get(videoUrl, timestamp);
+                    if (cached) {
+                        displayFrameInCell(cell, cached, i);
+                        continue;
+                    }
+
+                    // フレーム抽出
+                    const imageData = await extractFrame(STATE.frameExtractorVideo, timestamp);
+                    if (imageData && !STATE.extractionAborted) {
+                        displayFrameInCell(cell, imageData, i);
+                    } else {
+                        console.warn('Frame extraction failed for cell:', i, 'timestamp:', timestamp);
+                    }
+
+                    // UI更新のため少し待つ（フレームごとに5ms）
+                    await new Promise(r => setTimeout(r, 5));
+                }
+
+                console.log('Frame extraction completed');
+
+            } catch (error) {
+                console.error('Frame extraction error:', error);
+            } finally {
+                STATE.isExtractingFrames = false;
+            }
+        }
+
+        /**
+         * セルにフレームを表示（フェードインアニメーション）
+         */
+        function displayFrameInCell(cell, imageData, index) {
+            console.log('displayFrameInCell:', index);
+
+            // ローダーを削除
+            const loader = cell.querySelector('.cell-loader');
+            if (loader) loader.remove();
+
+            // 既存のcanvas/imgを削除
+            const existingMedia = cell.querySelector('canvas, img');
+            if (existingMedia) existingMedia.remove();
+
+            // img要素で直接表示（canvasよりシンプル）
+            const img = new Image();
+            img.onload = () => {
+                console.log('Image loaded for cell:', index);
+                img.style.opacity = '0';
+                img.style.transition = 'opacity 0.4s ease-in-out';
+                cell.insertBefore(img, cell.firstChild);
+
+                // フェードイン
+                requestAnimationFrame(() => {
+                    img.style.opacity = '1';
+                });
+
+                cell.classList.add('frame-loaded');
+            };
+            img.onerror = (e) => {
+                console.error('Image load error for cell:', index, e);
+            };
+            img.src = imageData.dataUrl;
+        }
+
+        /**
+         * フレーム抽出を中止
+         */
+        function abortFrameExtraction() {
+            STATE.extractionAborted = true;
+            if (STATE.frameExtractorVideo) {
+                STATE.frameExtractorVideo.remove();
+                STATE.frameExtractorVideo = null;
+            }
+        }
+
+        // DOM要素
+        const elements = {
+            treePanel: document.getElementById('treePanel'),
+            gridPanel: document.getElementById('gridPanel'),
+            gridContainer: document.getElementById('gridContainer'),
+            gridScrollWrapper: document.getElementById('gridScrollWrapper'),
+            thumbnailGrid: document.getElementById('thumbnailGrid'),
+            svgMarker: document.getElementById('svgMarker'),
+            cellHighlight: document.getElementById('cellHighlight'),
+            currentTime: document.getElementById('currentTime'),
+            totalTime: document.getElementById('totalTime'),
+            gridSizeDisplay: document.getElementById('gridSizeDisplay'),
+            overlayTime: document.getElementById('overlayTime'),
+            overlayCell: document.getElementById('overlayCell'),
+            apiStatus: document.getElementById('apiStatus'),
+            videoPlayer: document.getElementById('videoPlayer'),
+            playerPlaceholder: document.getElementById('playerPlaceholder'),
+            uploadDropzone: document.getElementById('uploadDropzone'),
+            fileInput: document.getElementById('fileInput'),
+            uploadProgress: document.getElementById('uploadProgress'),
+            uploadProgressBar: document.getElementById('uploadProgressBar'),
+            videoList: document.getElementById('videoList'),
+            playBtn: document.getElementById('playBtn'),
+            columnsSelect: document.getElementById('columnsSelect'),
+            intervalSelect: document.getElementById('intervalSelect'),
+            regenerateBtn: document.getElementById('regenerateBtn'),
+            loadingOverlay: document.getElementById('loadingOverlay'),
+            loadingText: document.getElementById('loadingText'),
+            infoOverlay: document.getElementById('infoOverlay')
+        };
+
+        // ==================================================
+        // 初期化
+        // ==================================================
+
+        function init() {
+            setupEventListeners();
+            checkApiConnection();
+            renderEmptyGrid();
+        }
+
+        function renderEmptyGrid() {
+            elements.thumbnailGrid.innerHTML = '';
+            elements.gridSizeDisplay.textContent = '--';
+            elements.svgMarker.style.display = 'none';
+            elements.cellHighlight.style.display = 'none';
+            elements.infoOverlay.style.display = 'none';
+        }
+
+        // ==================================================
+        // VAM準拠：高精度タイムスタンプ計算
+        // 元コード: vam5.70/utils/video_utils.py calculate_x_continuous_timestamp
+        // ==================================================
+
+        /**
+         * X軸連続モード対応のタイムスタンプ計算
+         * ★ VAMオリジナルコードを1ミリも狂わず移植 ★
+         *
+         * @param {number} relX - X座標の相対位置（0.0-1.0）
+         * @param {number} relY - Y座標の相対位置（0.0-1.0）
+         * @param {number} gridWidth - グリッドの列数
+         * @param {number} gridHeight - グリッドの行数
+         * @param {number} videoDuration - 動画の総時間（秒）
+         * @param {number} secondsPerCell - 1セルあたりの秒数
+         * @returns {number} 再生開始時刻（秒）
+         */
+        function calculateXContinuousTimestamp(relX, relY, gridWidth, gridHeight, videoDuration, secondsPerCell) {
+            if (videoDuration <= 0) {
+                return 0.0;
+            }
+
+            if (secondsPerCell && secondsPerCell > 0) {
+                // Y軸: 行単位で丸める（VAM準拠）
+                const rowIndex = Math.floor(relY * gridHeight);
+
+                // X軸: 連続的な値のまま計算（高精度）★重要★
+                const colContinuous = relX * gridWidth;
+
+                // 連続的なセルインデックスを計算
+                const continuousCellIndex = rowIndex * gridWidth + colContinuous;
+
+                // タイムスタンプを計算
+                const timestamp = continuousCellIndex * secondsPerCell;
+
+                return Math.max(0.0, Math.min(timestamp, videoDuration));
+            }
+
+            // secondsPerCellがない場合は従来の比例計算
+            const RESET_INTERVAL = 20;
+            const currentRow = relY * gridHeight;
+            const actualRow = Math.floor(currentRow);
+
+            const resetBlock = Math.floor(actualRow / RESET_INTERVAL);
+            const rowInBlock = actualRow % RESET_INTERVAL;
+
+            const blockStartRatio = (resetBlock * RESET_INTERVAL) / gridHeight;
+            const blockStartTime = blockStartRatio * videoDuration;
+
+            const cellsInBlock = rowInBlock * gridWidth + (relX * gridWidth);
+            const maxCellsInBlock = RESET_INTERVAL * gridWidth;
+            const blockProgressRatio = cellsInBlock / maxCellsInBlock;
+            const blockDuration = (RESET_INTERVAL / gridHeight) * videoDuration;
+
+            const timestamp = blockStartTime + (blockProgressRatio * blockDuration);
+
+            return Math.max(0.0, Math.min(timestamp, videoDuration));
+        }
+
+        /**
+         * 統一座標計算（マウス位置から相対座標を算出）
+         * ★ VAM準拠: _calculate_unified_coordinates ★
+         *
+         * @param {MouseEvent} e - マウスイベント
+         * @returns {{relX: number, relY: number}} 相対座標（0.0-0.999999）
+         */
+        function calculateUnifiedCoordinates(e) {
+            const grid = elements.thumbnailGrid;
+            const rect = grid.getBoundingClientRect();
+            const container = elements.gridContainer;
+            const cellEl = grid.children[0];
+            if (!cellEl) return { relX: 0, relY: 0 };
+
+            const cellHeight = cellEl.offsetHeight + 1;
+            const totalGridHeight = STATE.totalRows * cellHeight;
+
+            // ピクセル位置を計算
+            const pixelX = e.clientX - rect.left;
+            const pixelY = e.clientY - rect.top + container.scrollTop;
+
+            // 相対座標に変換（0.0-1.0）
+            let relX = pixelX / rect.width;
+            let relY = pixelY / totalGridHeight;
+
+            // 範囲制限：0.0-0.999999（1.0を避けて境界エラーを防止）★VAM準拠★
+            relX = Math.max(0.0, Math.min(0.999999, relX));
+            relY = Math.max(0.0, Math.min(0.999999, relY));
+
+            return { relX, relY };
+        }
+
+        /**
+         * 再生位置からグリッド座標を逆算
+         * ★ VAM準拠: update_marker_position_for_playback ★
+         *
+         * @param {number} currentTime - 現在の再生位置（秒）
+         * @returns {{relX: number, relY: number, cellX: number, cellY: number}}
+         */
+        function calculateGridPositionFromTime(currentTime) {
+            if (STATE.totalCells === 0 || CONFIG.secondsPerCell <= 0) {
+                return { relX: 0, relY: 0, cellX: 0, cellY: 0 };
+            }
+
+            // 連続的なセルインデックスを計算
+            const continuousCellIndex = currentTime / CONFIG.secondsPerCell;
+
+            // 行を計算
+            const currentRow = Math.floor(continuousCellIndex / CONFIG.columns);
+
+            // 行内の位置（小数値を保持）
+            const positionInRow = continuousCellIndex - (currentRow * CONFIG.columns);
+
+            // セル座標（整数）
+            const cellX = Math.floor(positionInRow);
+            const cellY = Math.min(currentRow, STATE.totalRows - 1);
+
+            // 相対座標（0.0-1.0）
+            const relX = positionInRow / CONFIG.columns;
+            const relY = (currentRow + 0.5) / STATE.totalRows;
+
+            return {
+                relX: Math.max(0, Math.min(relX, 0.999999)),
+                relY: Math.max(0, Math.min(relY, 0.999999)),
+                cellX: Math.max(0, Math.min(cellX, CONFIG.columns - 1)),
+                cellY: Math.max(0, Math.min(cellY, STATE.totalRows - 1))
+            };
+        }
+
+        // ==================================================
+        // ファイルアップロード
+        // ==================================================
+
+        async function uploadVideo(file) {
+            if (!file || !file.type.startsWith('video/')) {
+                alert('動画ファイルを選択してください');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            elements.uploadDropzone.classList.add('uploading');
+            elements.uploadProgress.classList.add('visible');
+            elements.uploadProgressBar.style.width = '0%';
+
+            try {
+                // アップロード（進捗は擬似的に表示）
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress = Math.min(progress + 10, 90);
+                    elements.uploadProgressBar.style.width = `${progress}%`;
+                }, 200);
+
+                const response = await fetch(`${API_BASE}/api/video/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                elements.uploadProgressBar.style.width = '100%';
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'アップロード失敗');
+                }
+
+                const data = await response.json();
+
+                // 動画リストに追加
+                STATE.videos.push(data);
+                renderVideoList();
+
+                // 動画を選択
+                selectVideo(data.video_id);
+
+            } catch (error) {
+                alert(`アップロードエラー: ${error.message}`);
+            } finally {
+                elements.uploadDropzone.classList.remove('uploading');
+                setTimeout(() => {
+                    elements.uploadProgress.classList.remove('visible');
+                }, 500);
+            }
+        }
+
+        function renderVideoList() {
+            elements.videoList.innerHTML = '';
+            STATE.videos.forEach(video => {
+                const item = document.createElement('div');
+                item.className = 'video-item' + (video.video_id === STATE.currentVideoId ? ' selected' : '');
+                item.innerHTML = `
+                    <span class="video-item-icon">🎬</span>
+                    <div class="video-item-info">
+                        <div class="video-item-name">${video.filename}</div>
+                        <div class="video-item-duration">${formatTime(video.duration)}</div>
+                    </div>
+                `;
+                item.addEventListener('click', () => selectVideo(video.video_id));
+                elements.videoList.appendChild(item);
+            });
+        }
+
+        async function selectVideo(videoId) {
+            STATE.currentVideoId = videoId;
+            const video = STATE.videos.find(v => v.video_id === videoId);
+            if (!video) return;
+
+            // UIを更新
+            renderVideoList();
+
+            // 動画プレーヤーを設定
+            elements.videoPlayer.src = `${API_BASE}${video.video_url}`;
+            elements.videoPlayer.classList.add('visible');
+            elements.playerPlaceholder.style.display = 'none';
+            elements.playBtn.disabled = false;
+            elements.regenerateBtn.disabled = false;
+
+            // 設定を更新
+            CONFIG.videoDuration = video.duration;
+            elements.totalTime.textContent = formatTime(video.duration);
+
+            // サムネイル生成
+            await generateThumbnails();
+        }
+
+        // ==================================================
+        // グリッド生成（クライアント側フレーム抽出）
+        // ==================================================
+
+        async function generateThumbnails() {
+            if (!STATE.currentVideoId) return;
+
+            // 既存のフレーム抽出を中止
+            abortFrameExtraction();
+
+            CONFIG.columns = parseInt(elements.columnsSelect.value) || 5;
+            CONFIG.secondsPerCell = parseInt(elements.intervalSelect.value) || 15;
+
+            showLoading('グリッド計算中...');
+
+            try {
+                // サーバー側でグリッド設定のみ計算（サムネイル生成はしない）
+                const response = await fetch(`${API_BASE}/api/grid/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        video_duration: CONFIG.videoDuration,
+                        columns: CONFIG.columns,
+                        seconds_per_cell: CONFIG.secondsPerCell
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'グリッド計算失敗');
+                }
+
+                const data = await response.json();
+                STATE.totalRows = data.rows;
+                STATE.totalCells = data.total_cells;
+
+                // グリッドを描画（フレームはクライアント側で抽出）
+                renderThumbnailGrid();
+                moveToCell(0, 0);
+
+            } catch (error) {
+                alert(`エラー: ${error.message}`);
+                renderEmptyGrid();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function renderThumbnailGrid() {
+            const grid = elements.thumbnailGrid;
+            grid.innerHTML = '';
+            grid.style.gridTemplateColumns = `repeat(${CONFIG.columns}, 1fr)`;
+
+            // グリッドセルを配置（フレームは後から抽出）
+            for (let i = 0; i < STATE.totalCells; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.index = i;
+
+                const time = i * CONFIG.secondsPerCell;
+
+                // ローディングスピナーを追加
+                const loader = document.createElement('div');
+                loader.className = 'cell-loader';
+                cell.appendChild(loader);
+
+                // 時間ラベル
+                const timeLabel = document.createElement('span');
+                timeLabel.className = 'cell-time';
+                timeLabel.textContent = formatTimeShort(time);
+                cell.appendChild(timeLabel);
+
+                grid.appendChild(cell);
+            }
+
+            // グリッドサイズ表示
+            elements.gridSizeDisplay.textContent = `${CONFIG.columns}列 × ${STATE.totalRows}行`;
+
+            // DOMレンダリング完了を待ってからマーカー初期化
+            requestAnimationFrame(() => {
+                // グリッドサイズを記録
+                updateGridDimensions();
+
+                // マーカー表示・初期化
+                initializeMarker();
+                elements.infoOverlay.style.display = 'block';
+
+                // フレーム抽出開始（プログレッシブ表示）
+                extractAllFrames();
+            });
+        }
+
+        /**
+         * グリッドのピクセルサイズを更新
+         */
+        function updateGridDimensions() {
+            const grid = elements.thumbnailGrid;
+            const cellEl = grid.children[0];
+            if (!cellEl) return;
+
+            STATE.cellWidth = cellEl.offsetWidth + 1;  // +1 for gap
+            STATE.cellHeight = cellEl.offsetHeight + 1;
+            STATE.gridWidth = STATE.cellWidth * CONFIG.columns;
+            STATE.gridHeight = STATE.cellHeight * STATE.totalRows;
+
+            // マーカーサイズ（セルの短辺の50%、最小24px、最大60px）
+            const minCellDimension = Math.min(STATE.cellWidth, STATE.cellHeight);
+            STATE.markerSize = Math.max(24, Math.min(minCellDimension * 0.5, 60));
+        }
+
+        /**
+         * SVGマーカーを初期化
+         */
+        function initializeMarker() {
+            // セルサイズが取得できていない場合は再試行
+            if (STATE.cellWidth === 0 || STATE.cellHeight === 0) {
+                console.warn('Cell dimensions not ready, retrying...');
+                requestAnimationFrame(() => {
+                    updateGridDimensions();
+                    initializeMarker();
+                });
+                return;
+            }
+
+            // マーカーサイズが小さすぎる場合はデフォルト値
+            if (STATE.markerSize < 20) {
+                STATE.markerSize = 40;
+            }
+
+            elements.svgMarker.style.display = 'block';
+            elements.svgMarker.style.width = `${STATE.markerSize}px`;
+            elements.svgMarker.style.height = `${STATE.markerSize}px`;
+
+            // 初期位置（左端、行の中央）
+            STATE.markerX = 0;
+            STATE.markerY = STATE.cellHeight / 2;
+            STATE.targetX = STATE.markerX;
+            STATE.targetY = STATE.markerY;
+
+            console.log('Marker initialized:', {
+                markerSize: STATE.markerSize,
+                cellWidth: STATE.cellWidth,
+                cellHeight: STATE.cellHeight,
+                markerX: STATE.markerX,
+                markerY: STATE.markerY
+            });
+
+            renderMarker();
+        }
+
+        // ==================================================
+        // マーカー移動（VAM準拠：滑らかなピクセル単位移動）
+        // ==================================================
+
+        /**
+         * マーカーを描画（transformで高速更新）
+         */
+        function renderMarker() {
+            const halfSize = STATE.markerSize / 2;
+            elements.svgMarker.style.transform = `translate(${STATE.markerX - halfSize}px, ${STATE.markerY - halfSize}px)`;
+        }
+
+        /**
+         * マーカーを目標位置に滑らかに移動（VAM準拠のアニメーション）
+         * @param {number} targetX - 目標X座標（ピクセル）
+         * @param {number} targetY - 目標Y座標（ピクセル）
+         * @param {boolean} animate - アニメーションするかどうか
+         */
+        function moveMarkerTo(targetX, targetY, animate = true) {
+            STATE.targetX = targetX;
+            STATE.targetY = targetY;
+
+            if (!animate) {
+                // 即座に移動
+                STATE.markerX = targetX;
+                STATE.markerY = targetY;
+                renderMarker();
+                return;
+            }
+
+            // アニメーション開始
+            if (!STATE.isAnimating) {
+                STATE.isAnimating = true;
+                animateMarker();
+            }
+        }
+
+        /**
+         * マーカーアニメーション（VAM準拠：ease-out風補間）
+         * ★ 60fpsで滑らかに移動 ★
+         */
+        function animateMarker() {
+            // 目標との距離
+            const dx = STATE.targetX - STATE.markerX;
+            const dy = STATE.targetY - STATE.markerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // 十分近ければ停止
+            if (distance < 0.5) {
+                STATE.markerX = STATE.targetX;
+                STATE.markerY = STATE.targetY;
+                STATE.isAnimating = false;
+                renderMarker();
+                return;
+            }
+
+            // ease-out風の補間（VAM準拠：12%ずつ近づく）
+            const factor = 0.15;
+            STATE.markerX += dx * factor;
+            STATE.markerY += dy * factor;
+
+            renderMarker();
+
+            // 次フレーム
+            STATE.animationId = requestAnimationFrame(animateMarker);
+        }
+
+        /**
+         * 再生時刻からマーカー位置を計算（ピクセル座標）
+         * ★ VAM準拠：calculate_position_from_playback を移植 ★
+         * X軸: 左端(0)から右端(gridWidth)まで連続移動
+         * Y軸: 行の中央に固定
+         */
+        function calculateMarkerPositionFromTime(currentTime) {
+            if (STATE.totalCells === 0 || CONFIG.secondsPerCell <= 0 || STATE.cellWidth === 0) {
+                return { x: 0, y: STATE.cellHeight / 2 || 0 };
+            }
+
+            // 連続的なセルインデックスを計算（小数値）
+            const continuousCellIndex = currentTime / CONFIG.secondsPerCell;
+
+            // 行番号（整数）
+            let currentRow = Math.floor(continuousCellIndex / CONFIG.columns);
+            currentRow = Math.max(0, Math.min(currentRow, STATE.totalRows - 1));
+
+            // 行内の位置（小数値を保持）
+            let positionInRow = continuousCellIndex - (currentRow * CONFIG.columns);
+
+            // X座標: 0（左端）から gridWidth（右端）まで
+            // positionInRow: 0 → x=0, positionInRow: columns → x=gridWidth
+            const x = (positionInRow / CONFIG.columns) * STATE.gridWidth;
+
+            // Y座標: 行の中央
+            const y = (currentRow + 0.5) * STATE.cellHeight;
+
+            return {
+                x: Math.max(0, Math.min(x, STATE.gridWidth)),
+                y: Math.max(STATE.cellHeight / 2, Math.min(y, STATE.gridHeight - STATE.cellHeight / 2))
+            };
+        }
+
+        /**
+         * セル単位での移動（キーボード操作用）
+         */
+        function moveToCell(col, row) {
+            if (STATE.totalCells === 0) return;
+
+            // 境界チェック
+            col = Math.max(0, Math.min(col, CONFIG.columns - 1));
+            row = Math.max(0, Math.min(row, STATE.totalRows - 1));
+
+            // 最終セルを超えないようにチェック
+            const cellIndex = row * CONFIG.columns + col;
+            if (cellIndex >= STATE.totalCells) {
+                const lastIndex = STATE.totalCells - 1;
+                row = Math.floor(lastIndex / CONFIG.columns);
+                col = lastIndex % CONFIG.columns;
+            }
+
+            // セル座標を更新
+            STATE.currentCellX = col;
+            STATE.currentCellY = row;
+
+            // 相対座標も更新（セル左端基準）
+            STATE.currentRelX = col / CONFIG.columns;
+            STATE.currentRelY = (row + 0.5) / STATE.totalRows;
+
+            // マーカーをセル左端に移動（Y軸は行中央）
+            const targetX = col * STATE.cellWidth;
+            const targetY = (row + 0.5) * STATE.cellHeight;
+            moveMarkerTo(targetX, targetY, true);
+
+            updateDisplay();
+            scrollToMarker();
+
+            // 動画をシーク
+            seekVideoWithContinuousMode();
+        }
+
+        /**
+         * ピクセル座標で移動（ドラッグ・再生追従用）
+         * ★ VAM準拠: 滑らかな連続移動 ★
+         */
+        function moveToPixelPosition(x, y, animate = true) {
+            if (STATE.totalCells === 0) return;
+
+            // 境界チェック
+            x = Math.max(0, Math.min(x, STATE.gridWidth));
+            y = Math.max(0, Math.min(y, STATE.gridHeight));
+
+            // 相対座標に変換
+            STATE.currentRelX = x / STATE.gridWidth;
+            STATE.currentRelY = y / STATE.gridHeight;
+
+            // セル座標を計算（表示用）
+            STATE.currentCellX = Math.floor(STATE.currentRelX * CONFIG.columns);
+            STATE.currentCellY = Math.floor(STATE.currentRelY * STATE.totalRows);
+
+            // 境界チェック
+            STATE.currentCellX = Math.max(0, Math.min(STATE.currentCellX, CONFIG.columns - 1));
+            STATE.currentCellY = Math.max(0, Math.min(STATE.currentCellY, STATE.totalRows - 1));
+
+            // マーカーを移動
+            moveMarkerTo(x, y, animate);
+
+            updateDisplay();
+        }
+
+        function moveRelative(dx, dy) {
+            // マニュアル移動フラグを設定（追従を一時停止）
+            setManualMoveFlag();
+            moveToCell(STATE.currentCellX + dx, STATE.currentCellY + dy);
+        }
+
+        /**
+         * マニュアル移動フラグを設定
+         */
+        function setManualMoveFlag() {
+            STATE.isManuallyMoved = true;
+            if (STATE.manualMoveTimeout) {
+                clearTimeout(STATE.manualMoveTimeout);
+            }
+            STATE.manualMoveTimeout = setTimeout(() => {
+                STATE.isManuallyMoved = false;
+            }, 500);
+        }
+
+        function scrollToMarker() {
+            const container = elements.gridContainer;
+            const markerY = STATE.targetY;
+            const containerHeight = container.clientHeight;
+            const scrollTop = container.scrollTop;
+
+            if (markerY < scrollTop + STATE.cellHeight) {
+                container.scrollTop = Math.max(0, markerY - STATE.cellHeight);
+            } else if (markerY > scrollTop + containerHeight - STATE.cellHeight * 2) {
+                container.scrollTop = markerY - containerHeight + STATE.cellHeight * 2;
+            }
+        }
+
+        // ==================================================
+        // 動画制御（VAM準拠：X軸連続モード対応）
+        // ==================================================
+
+        /**
+         * X軸連続モードでシーク
+         */
+        function seekVideoWithContinuousMode() {
+            if (!elements.videoPlayer.src || CONFIG.videoDuration <= 0) return;
+
+            const timestamp = calculateXContinuousTimestamp(
+                STATE.currentRelX,
+                STATE.currentRelY,
+                CONFIG.columns,
+                STATE.totalRows,
+                CONFIG.videoDuration,
+                CONFIG.secondsPerCell
+            );
+
+            elements.videoPlayer.currentTime = timestamp;
+        }
+
+        function togglePlay() {
+            if (elements.videoPlayer.paused) {
+                elements.videoPlayer.play();
+                elements.playBtn.textContent = '⏸ 停止';
+            } else {
+                elements.videoPlayer.pause();
+                elements.playBtn.textContent = '▶ 再生';
+            }
+        }
+
+        // ==================================================
+        // 表示更新（VAM準拠：高精度タイムスタンプ表示）
+        // ==================================================
+
+        function updateDisplay() {
+            // X軸連続モードで正確なタイムスタンプを計算
+            const timestamp = calculateXContinuousTimestamp(
+                STATE.currentRelX,
+                STATE.currentRelY,
+                CONFIG.columns,
+                STATE.totalRows,
+                CONFIG.videoDuration,
+                CONFIG.secondsPerCell
+            );
+
+            // 時間表示
+            const timeStr = formatTime(timestamp);
+            elements.currentTime.textContent = timeStr;
+            elements.overlayTime.textContent = timeStr;
+
+            // セル情報（相対座標も表示）
+            elements.overlayCell.textContent = `(${STATE.currentCellX}, ${STATE.currentCellY})`;
+        }
+
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+
+            if (h > 0) {
+                return `${h}:${String(m).padStart(2, '0')}:${s.toFixed(2).padStart(5, '0')}`;
+            }
+            return `${String(m).padStart(2, '0')}:${s.toFixed(2).padStart(5, '0')}`;
+        }
+
+        function formatTimeShort(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${String(s).padStart(2, '0')}`;
+        }
+
+        function showLoading(text) {
+            elements.loadingText.textContent = text;
+            elements.loadingOverlay.classList.add('visible');
+        }
+
+        function hideLoading() {
+            elements.loadingOverlay.classList.remove('visible');
+        }
+
+        // ==================================================
+        // イベントリスナー
+        // ==================================================
+
+        function setupEventListeners() {
+            // キーボード操作
+            document.addEventListener('keydown', handleKeyDown);
+
+            // グリッドでのドラッグ操作
+            elements.gridContainer.addEventListener('mousedown', handleMouseDown);
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+
+            // グリッドでのクリック
+            elements.thumbnailGrid.addEventListener('click', handleGridClick);
+
+            // アップロード
+            elements.uploadDropzone.addEventListener('click', () => elements.fileInput.click());
+            elements.fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) uploadVideo(e.target.files[0]);
+            });
+
+            // ドラッグ&ドロップ
+            elements.uploadDropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                elements.uploadDropzone.classList.add('dragover');
+            });
+            elements.uploadDropzone.addEventListener('dragleave', () => {
+                elements.uploadDropzone.classList.remove('dragover');
+            });
+            elements.uploadDropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                elements.uploadDropzone.classList.remove('dragover');
+                if (e.dataTransfer.files[0]) uploadVideo(e.dataTransfer.files[0]);
+            });
+
+            // コントロール
+            elements.playBtn.addEventListener('click', togglePlay);
+            elements.regenerateBtn.addEventListener('click', generateThumbnails);
+
+            // 動画イベント
+            elements.videoPlayer.addEventListener('timeupdate', handleVideoTimeUpdate);
+            elements.videoPlayer.addEventListener('play', () => elements.playBtn.textContent = '⏸ 停止');
+            elements.videoPlayer.addEventListener('pause', () => elements.playBtn.textContent = '▶ 再生');
+        }
+
+        function handleKeyDown(e) {
+            // テキスト入力中は無視
+            if (e.target.tagName === 'INPUT') return;
+
+            // Tキー: ツリービュー切替
+            if (e.key === 't' || e.key === 'T') {
+                elements.treePanel.classList.toggle('collapsed');
+                e.preventDefault();
+                return;
+            }
+
+            // スペース: 再生/停止
+            if (e.key === ' ') {
+                if (STATE.currentVideoId) togglePlay();
+                e.preventDefault();
+                return;
+            }
+
+            // 方向キー: マーカー移動
+            switch (e.key) {
+                case 'ArrowUp':
+                    moveRelative(0, -1);
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                    moveRelative(0, 1);
+                    e.preventDefault();
+                    break;
+                case 'ArrowLeft':
+                    moveRelative(-1, 0);
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    moveRelative(1, 0);
+                    e.preventDefault();
+                    break;
+                case 'Home':
+                    moveToCell(0, 0);
+                    e.preventDefault();
+                    break;
+                case 'End':
+                    if (STATE.totalCells > 0) {
+                        const lastIndex = STATE.totalCells - 1;
+                        moveToCell(lastIndex % CONFIG.columns, Math.floor(lastIndex / CONFIG.columns));
+                    }
+                    e.preventDefault();
+                    break;
+                case 'PageUp':
+                    moveRelative(0, -10);
+                    e.preventDefault();
+                    break;
+                case 'PageDown':
+                    moveRelative(0, 10);
+                    e.preventDefault();
+                    break;
+            }
+        }
+
+        /**
+         * マウスダウン: ドラッグ開始
+         * ★ VAM準拠: ピクセル座標で移動 ★
+         */
+        function handleMouseDown(e) {
+            if (e.target.closest('.thumbnail-grid')) {
+                STATE.isDragging = true;
+                setManualMoveFlag();
+
+                // ピクセル座標を計算
+                const pos = getMousePositionInGrid(e);
+                moveToPixelPosition(pos.x, pos.y, false);  // 即座に移動
+                seekVideoWithContinuousMode();
+            }
+        }
+
+        /**
+         * マウス移動: ドラッグ中
+         * ★ VAM準拠: ピクセル単位で滑らかに追従 ★
+         */
+        function handleMouseMove(e) {
+            if (STATE.isDragging) {
+                const pos = getMousePositionInGrid(e);
+                moveToPixelPosition(pos.x, pos.y, false);  // ドラッグ中は即座に追従
+                seekVideoWithContinuousMode();
+            }
+        }
+
+        /**
+         * マウスアップ: ドラッグ終了
+         */
+        function handleMouseUp() {
+            if (STATE.isDragging) {
+                STATE.isDragging = false;
+                scrollToMarker();
+            }
+        }
+
+        /**
+         * グリッド内のマウス位置を取得（ピクセル座標）
+         * グリッド全体の座標系（スクロール込み）で返す
+         */
+        function getMousePositionInGrid(e) {
+            const grid = elements.thumbnailGrid;
+            const container = elements.gridContainer;
+
+            // グリッドのビューポート上の位置
+            const gridRect = grid.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+
+            // マウス位置（コンテナ内の相対座標）
+            const mouseXInContainer = e.clientX - containerRect.left;
+            const mouseYInContainer = e.clientY - containerRect.top;
+
+            // スクロール位置を加算してグリッド全体での座標を計算
+            const x = mouseXInContainer;
+            const y = mouseYInContainer + container.scrollTop;
+
+            return {
+                x: Math.max(0, Math.min(x, STATE.gridWidth)),
+                y: Math.max(0, Math.min(y, STATE.gridHeight))
+            };
+        }
+
+        /**
+         * グリッドクリック: その位置に移動
+         */
+        function handleGridClick(e) {
+            if (STATE.isDragging) return;
+
+            setManualMoveFlag();
+            const pos = getMousePositionInGrid(e);
+            moveToPixelPosition(pos.x, pos.y, true);  // アニメーション付きで移動
+            seekVideoWithContinuousMode();
+        }
+
+        /**
+         * 動画再生追従（VAM準拠）
+         * ★ 再生時刻に合わせてマーカーが滑らかに連続移動 ★
+         */
+        function handleVideoTimeUpdate() {
+            const currentTime = elements.videoPlayer.currentTime;
+
+            // マニュアル移動中またはドラッグ中は追従しない
+            if (STATE.isManuallyMoved || STATE.isDragging) {
+                elements.currentTime.textContent = formatTime(currentTime);
+                return;
+            }
+
+            // グリッドのマーカーを更新
+            if (STATE.totalCells > 0 && STATE.cellWidth > 0) {
+                // 再生位置からピクセル座標を計算（滑らかな連続移動）
+                const pos = calculateMarkerPositionFromTime(currentTime);
+
+                // マーカーを滑らかに移動（アニメーション付き）
+                moveMarkerTo(pos.x, pos.y, true);
+
+                // セル座標を更新（表示用）
+                const continuousCellIndex = currentTime / CONFIG.secondsPerCell;
+                const currentRow = Math.floor(continuousCellIndex / CONFIG.columns);
+                const positionInRow = continuousCellIndex - (currentRow * CONFIG.columns);
+
+                STATE.currentCellX = Math.floor(positionInRow);
+                STATE.currentCellY = Math.min(currentRow, STATE.totalRows - 1);
+                STATE.currentRelX = positionInRow / CONFIG.columns;
+                STATE.currentRelY = (currentRow + 0.5) / STATE.totalRows;
+
+                // スクロール（行が変わった時のみ）
+                const newRow = Math.floor(STATE.targetY / STATE.cellHeight);
+                if (newRow !== Math.floor(STATE.markerY / STATE.cellHeight)) {
+                    scrollToMarker();
+                }
+            }
+
+            // 時刻表示を更新
+            elements.currentTime.textContent = formatTime(currentTime);
+            elements.overlayTime.textContent = formatTime(currentTime);
+            elements.overlayCell.textContent = `(${STATE.currentCellX}, ${STATE.currentCellY})`;
+        }
+
+        // ==================================================
+        // API接続
+        // ==================================================
+
+        async function checkApiConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                if (response.ok) {
+                    STATE.isApiConnected = true;
+                    elements.apiStatus.textContent = 'API: 接続OK';
+                    elements.apiStatus.style.color = '#4caf50';
+                    return;
+                }
+            } catch (e) {
+                console.log('API not available');
+            }
+            STATE.isApiConnected = false;
+            elements.apiStatus.textContent = 'API: 未接続';
+            elements.apiStatus.style.color = '#f44336';
+        }
+
+        // ==================================================
+        // 起動
+        // ==================================================
+
+        init();
+        setInterval(checkApiConnection, 10000);
+    </script>
+</body>
+</html>

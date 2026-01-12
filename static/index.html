@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAM Seek - 2Dシークマーカー デモ</title>
+    <style>
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d30;
+            --border-color: #3c3c3c;
+            --accent: #8b5cf6;
+            --highlight: #e94560;
+            --text: #cccccc;
+            --text-dim: #808080;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: calc(100vh - 32px);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 左パネル */
+        .left-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease;
+        }
+
+        .left-panel.collapsed {
+            width: 40px;
+        }
+
+        .left-panel.collapsed .upload-area,
+        .left-panel.collapsed .video-list,
+        .left-panel.collapsed .panel-title {
+            display: none;
+        }
+
+        .left-panel.collapsed .panel-header {
+            padding: 12px 8px;
+            justify-content: center;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-toggle {
+            background: none;
+            border: none;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .panel-toggle:hover {
+            background: var(--bg-primary);
+        }
+
+        .upload-area {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .upload-dropzone {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 32px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-dropzone:hover,
+        .upload-dropzone.dragover {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .upload-icon { font-size: 40px; margin-bottom: 12px; }
+        .upload-text { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+
+        .video-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+        .video-item {
+            padding: 10px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: 3px solid transparent;
+            transition: background 0.2s;
+        }
+
+        .video-item:hover { background: var(--bg-tertiary); }
+        .video-item.selected { background: var(--accent); border-left-color: var(--highlight); }
+        .video-item-icon { font-size: 18px; }
+        .video-item-info { flex: 1; overflow: hidden; }
+        .video-item-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .video-item-duration { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+        /* 中央エリア */
+        .main-area {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .player-area {
+            flex: 0 0 auto;
+            height: 50%;
+            min-height: 200px;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .grid-area {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .player-placeholder {
+            color: var(--text-dim);
+            font-size: 15px;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        #videoPlayer {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+        }
+
+        #videoPlayer.visible { display: block; }
+
+        .control-bar {
+            height: 48px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 16px;
+        }
+
+        .btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text);
+            padding: 6px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover { background: var(--accent); border-color: var(--accent); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-primary { background: var(--accent); border-color: var(--accent); }
+
+        .time-display {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+        }
+
+        .time-current { color: var(--highlight); font-weight: bold; }
+
+        /* グリッドパネル（動画の下に表示） */
+        .grid-panel {
+            flex: 1;
+            background: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            transition: flex 0.3s ease, min-height 0.3s ease;
+        }
+
+        .grid-panel.collapsed {
+            flex: 0 0 40px;
+            min-height: 40px;
+        }
+
+        .grid-panel.collapsed .grid-container {
+            display: none;
+        }
+
+        .grid-panel.collapsed .grid-settings {
+            display: none;
+        }
+
+        .grid-toggle {
+            background: none;
+            border: none;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .grid-toggle:hover {
+            background: var(--bg-primary);
+        }
+
+        .grid-header {
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .grid-settings {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .grid-label { color: var(--text-dim); font-size: 11px; }
+
+        .grid-select {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text);
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .grid-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        .grid-scroll-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .thumbnail-grid {
+            display: grid;
+            gap: 2px;
+            background: var(--border-color);
+        }
+
+        .grid-cell {
+            aspect-ratio: 16/9;
+            background: var(--bg-tertiary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .grid-cell img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .grid-cell img.loaded { opacity: 1; }
+
+        .cell-loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .grid-cell.loaded .cell-loader { display: none; }
+
+        .cell-time {
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            background: rgba(0,0,0,0.75);
+            padding: 2px 6px;
+            font-size: 10px;
+            border-radius: 3px;
+            pointer-events: none;
+        }
+
+        /* マーカー */
+        .svg-marker {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 50;
+            display: none;
+            will-change: transform;
+        }
+
+        .svg-marker svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 情報フッター（グリッドパネル下部固定） */
+        .info-footer {
+            flex: 0 0 auto;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border-color);
+            padding: 8px 12px;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
+            display: none;
+        }
+
+        .info-footer.visible {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-label { color: var(--text-dim); }
+        .info-value { color: var(--highlight); font-weight: bold; }
+
+        /* ローディング */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .loading-overlay.visible { display: flex; }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ステータスバー */
+        .status-bar {
+            height: 32px;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-size: 12px;
+            gap: 24px;
+        }
+
+        .status-item { display: flex; align-items: center; gap: 6px; }
+        .status-key {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        #fileInput { display: none; }
+
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4a4a4a; }
+
+        /* Tablet - 左パネル非表示 */
+        @media (max-width: 1024px) {
+            .left-panel { display: none; }
+        }
+
+        /* Mobile - 縦並びレイアウト */
+        @media (max-width: 768px) {
+            body {
+                height: 100vh;
+                overflow: hidden;
+            }
+            .app-container {
+                flex-direction: column;
+                height: calc(100vh - 40px);
+            }
+            .main-area {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+            }
+            /* 動画エリア上部固定 */
+            .player-area {
+                flex: 0 0 auto;
+                height: 35vh;
+                min-height: 180px;
+                max-height: 280px;
+            }
+            .control-bar {
+                flex: 0 0 auto;
+                flex-wrap: wrap;
+                height: auto;
+                padding: 6px 10px;
+                gap: 6px;
+            }
+            /* グリッドエリアがスクロール */
+            .grid-panel {
+                flex: 1;
+                min-height: 0;
+                overflow: hidden;
+            }
+            .grid-container {
+                flex: 1;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .grid-header {
+                flex: 0 0 auto;
+                flex-wrap: wrap;
+                gap: 6px;
+                padding: 6px 10px;
+            }
+            .grid-settings {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .status-bar {
+                height: 40px;
+                padding: 0 10px;
+                gap: 12px;
+            }
+        }
+
+        /* Mobile Portrait - さらに小さい画面 */
+        @media (max-width: 480px) {
+            .player-area {
+                height: 30vh;
+                min-height: 160px;
+                max-height: 220px;
+            }
+            .grid-header {
+                font-size: 11px;
+            }
+            .grid-settings {
+                gap: 4px;
+            }
+            .grid-select {
+                padding: 4px 6px;
+                font-size: 11px;
+            }
+            .grid-label {
+                font-size: 10px;
+            }
+            .btn {
+                padding: 5px 8px;
+                font-size: 11px;
+            }
+            .time-display {
+                font-size: 11px;
+            }
+            .status-bar {
+                font-size: 10px;
+                height: 36px;
+            }
+            .status-key {
+                padding: 2px 4px;
+                font-size: 9px;
+            }
+            .cell-time {
+                font-size: 8px;
+                padding: 1px 3px;
+            }
+            .info-footer {
+                font-size: 10px;
+                padding: 6px 10px;
+            }
+        }
+
+        /* タッチデバイス最適化 */
+        @media (hover: none) and (pointer: coarse) {
+            .grid-cell {
+                min-height: 50px;
+            }
+            .btn {
+                min-height: 40px;
+                min-width: 40px;
+            }
+            .grid-select {
+                min-height: 32px;
+            }
+            .upload-dropzone {
+                padding: 20px 12px;
+            }
+            /* スムーズスクロール */
+            .grid-container {
+                scroll-behavior: smooth;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 左パネル -->
+        <div class="left-panel" id="leftPanel">
+            <div class="panel-header">
+                <button type="button" class="panel-toggle" id="leftPanelToggle" title="パネルを折りたたむ">◀</button>
+                <span class="panel-title">動画一覧</span>
+            </div>
+            <div class="upload-area">
+                <div class="upload-dropzone" id="uploadDropzone">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">
+                        動画ファイルをドロップ<br>
+                        またはクリックして選択<br>
+                        <small style="color: #666">※ローカルファイルを直接読み込み（アップロード不要）</small>
+                    </div>
+                </div>
+                <input type="file" id="fileInput" accept="video/*">
+            </div>
+            <div class="video-list" id="videoList"></div>
+        </div>
+
+        <!-- メインコンテンツ（動画 + グリッド縦並び） -->
+        <div class="main-area">
+            <!-- 動画エリア -->
+            <div class="player-area" id="playerArea">
+                <div class="player-placeholder" id="playerPlaceholder">
+                    動画ファイルを選択してください<br>
+                    <small>MP4, WebM, MOV 対応</small><br>
+                    <small style="color: #888">※完全クライアント処理（サーバーへのアップロードなし）</small>
+                </div>
+                <video id="videoPlayer" controls playsinline></video>
+            </div>
+            <div class="control-bar">
+                <button type="button" class="btn" id="playBtn" disabled>▶ 再生</button>
+                <div class="time-display">
+                    <span class="time-current" id="currentTime">00:00.00</span>
+                    <span> / </span>
+                    <span id="totalTime">00:00.00</span>
+                </div>
+                <div style="flex:1"></div>
+                <span style="font-size: 12px; color: var(--text-dim)">
+                    グリッド: <span id="gridSizeDisplay">--</span>
+                </span>
+            </div>
+
+            <!-- グリッドエリア（動画の下） -->
+            <div class="grid-panel" id="gridPanel">
+            <div class="grid-header">
+                <button type="button" class="grid-toggle" id="gridToggle" title="グリッドを折りたたむ">▼</button>
+                <span class="grid-title">サムネイルグリッド</span>
+                <div class="grid-settings">
+                    <span class="grid-label">列:</span>
+                    <select class="grid-select" id="columnsSelect">
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                    </select>
+                    <span class="grid-label">秒/セル:</span>
+                    <select class="grid-select" id="intervalSelect">
+                        <option value="5" selected>5s</option>
+                        <option value="10">10s</option>
+                        <option value="15">15s</option>
+                        <option value="30">30s</option>
+                        <option value="60">1m</option>
+                    </select>
+                    <button type="button" class="btn btn-primary" id="regenerateBtn" disabled>生成</button>
+                </div>
+            </div>
+            <div class="grid-container" id="gridContainer">
+                <div class="grid-scroll-wrapper" id="gridScrollWrapper">
+                    <div class="thumbnail-grid" id="thumbnailGrid"></div>
+                    <div class="svg-marker" id="svgMarker">
+                        <svg viewBox="0 0 155.91 155.91">
+                            <circle cx="77.95" cy="77.95" r="63.49" fill="#b7392b" stroke="#fff" stroke-miterlimit="10" stroke-width="8"/>
+                            <path fill="#fff" d="M66.6,109.32c-5.24,3.39-9.52,1.05-9.52-5.18v-52.38c0-6.24,4.28-8.57,9.52-5.18l38.99,25.21c5.24,3.39,5.24,8.93,0,12.31l-38.99,25.21Z"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="spinner"></div>
+                    <div id="loadingText">フレーム抽出中...</div>
+                </div>
+            </div>
+            <div class="info-footer" id="infoFooter">
+                <div class="info-item">
+                    <span class="info-label">時間:</span>
+                    <span class="info-value" id="overlayTime">00:00.00</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">セル:</span>
+                    <span class="info-value" id="overlayCell">(0, 0)</span>
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item"><span class="status-key">タッチ/ドラッグ</span> シーク</div>
+        <div class="status-item"><span class="status-key">↑↓←→</span> マーカー移動</div>
+        <div style="flex:1"></div>
+        <div class="status-item" style="color: rgba(255,255,255,0.8)">2D Seek Bar</div>
+    </div>
+
+    <script>
+        // ==================================================
+        // VAM Seek - 静的版デモ（サーバー不要）
+        // ==================================================
+
+        // 設定
+        const CONFIG = {
+            columns: 3,
+            secondsPerCell: 5,
+            thumbWidth: 160,
+            thumbHeight: 90,
+            videoDuration: 0
+        };
+
+        // 状態
+        const STATE = {
+            totalRows: 0,
+            totalCells: 0,
+            gridWidth: 0,
+            gridHeight: 0,
+            cellWidth: 0,
+            cellHeight: 0,
+            markerX: 0,
+            markerY: 0,
+            targetX: 0,
+            targetY: 0,
+            currentCellX: 0,
+            currentCellY: 0,
+            isDragging: false,
+            isAnimating: false,
+            animationId: null,
+            videos: [],
+            currentVideoUrl: null,
+            frameExtractorVideo: null,
+            isExtracting: false,
+            aborted: false
+        };
+
+        // LRUキャッシュ
+        class FrameCache {
+            constructor(maxSize = 200) {
+                this.cache = new Map();
+                this.maxSize = maxSize;
+            }
+            _key(src, ts) { return `${src}@${ts.toFixed(2)}`; }
+            get(src, ts) {
+                const k = this._key(src, ts);
+                if (!this.cache.has(k)) return null;
+                const v = this.cache.get(k);
+                this.cache.delete(k);
+                this.cache.set(k, v);
+                return v;
+            }
+            put(src, ts, data) {
+                const k = this._key(src, ts);
+                if (this.cache.has(k)) this.cache.delete(k);
+                else if (this.cache.size >= this.maxSize) {
+                    const first = this.cache.keys().next().value;
+                    this.cache.delete(first);
+                }
+                this.cache.set(k, data);
+            }
+            clear() { this.cache.clear(); }
+            get size() { return this.cache.size; }
+        }
+
+        const frameCache = new FrameCache(200);
+
+        // DOM要素
+        const $ = id => document.getElementById(id);
+        const elements = {
+            uploadDropzone: $('uploadDropzone'),
+            fileInput: $('fileInput'),
+            videoList: $('videoList'),
+            videoPlayer: $('videoPlayer'),
+            playerPlaceholder: $('playerPlaceholder'),
+            playBtn: $('playBtn'),
+            currentTime: $('currentTime'),
+            totalTime: $('totalTime'),
+            gridSizeDisplay: $('gridSizeDisplay'),
+            columnsSelect: $('columnsSelect'),
+            intervalSelect: $('intervalSelect'),
+            regenerateBtn: $('regenerateBtn'),
+            gridContainer: $('gridContainer'),
+            thumbnailGrid: $('thumbnailGrid'),
+            svgMarker: $('svgMarker'),
+            infoFooter: $('infoFooter'),
+            overlayTime: $('overlayTime'),
+            overlayCell: $('overlayCell'),
+            loadingOverlay: $('loadingOverlay'),
+            loadingText: $('loadingText'),
+            gridPanel: $('gridPanel'),
+            gridToggle: $('gridToggle'),
+            leftPanel: $('leftPanel'),
+            leftPanelToggle: $('leftPanelToggle')
+        };
+
+        // ==================================================
+        // グリッド計算（サーバーAPI不要 - クライアントで計算）
+        // ==================================================
+
+        function calculateGridConfig(videoDuration, columns, secondsPerCell) {
+            const totalCells = Math.ceil(videoDuration / secondsPerCell);
+            const rows = Math.ceil(totalCells / columns);
+            return { rows, columns, totalCells, secondsPerCell, videoDuration };
+        }
+
+        // ==================================================
+        // ファイル読み込み（サーバーアップロード不要）
+        // ==================================================
+
+        function handleFileSelect(file) {
+            if (!file || !file.type.startsWith('video/')) {
+                alert('動画ファイルを選択してください');
+                return;
+            }
+
+            const url = URL.createObjectURL(file);
+            const videoData = {
+                id: Date.now().toString(),
+                name: file.name,
+                url: url,
+                duration: 0
+            };
+
+            // 動画の長さを取得
+            const tempVideo = document.createElement('video');
+            tempVideo.src = url;
+            tempVideo.addEventListener('loadedmetadata', () => {
+                videoData.duration = tempVideo.duration;
+                STATE.videos.push(videoData);
+                renderVideoList();
+                selectVideo(videoData.id);
+            });
+        }
+
+        function renderVideoList() {
+            elements.videoList.innerHTML = STATE.videos.map(v => `
+                <div class="video-item${STATE.currentVideoUrl === v.url ? ' selected' : ''}" data-id="${v.id}">
+                    <span class="video-item-icon">🎬</span>
+                    <div class="video-item-info">
+                        <div class="video-item-name">${v.name}</div>
+                        <div class="video-item-duration">${formatTime(v.duration)}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            elements.videoList.querySelectorAll('.video-item').forEach(el => {
+                el.addEventListener('click', () => selectVideo(el.dataset.id));
+            });
+        }
+
+        function selectVideo(id) {
+            const video = STATE.videos.find(v => v.id === id);
+            if (!video) return;
+
+            STATE.currentVideoUrl = video.url;
+            elements.videoPlayer.src = video.url;
+            elements.videoPlayer.classList.add('visible');
+            elements.playerPlaceholder.style.display = 'none';
+            elements.playBtn.disabled = false;
+            elements.regenerateBtn.disabled = false;
+
+            elements.videoPlayer.addEventListener('loadedmetadata', () => {
+                CONFIG.videoDuration = elements.videoPlayer.duration;
+                elements.totalTime.textContent = formatTime(CONFIG.videoDuration);
+                generateThumbnails();
+            }, { once: true });
+
+            renderVideoList();
+        }
+
+        // ==================================================
+        // サムネイル生成（完全クライアント処理）
+        // ==================================================
+
+        async function generateThumbnails() {
+            if (!STATE.currentVideoUrl) return;
+
+            STATE.aborted = true;
+            await new Promise(r => setTimeout(r, 50));
+
+            CONFIG.columns = parseInt(elements.columnsSelect.value);
+            CONFIG.secondsPerCell = parseInt(elements.intervalSelect.value);
+
+            showLoading('グリッド生成中...');
+
+            const config = calculateGridConfig(
+                CONFIG.videoDuration,
+                CONFIG.columns,
+                CONFIG.secondsPerCell
+            );
+
+            STATE.totalRows = config.rows;
+            STATE.totalCells = config.totalCells;
+
+            elements.gridSizeDisplay.textContent = `${CONFIG.columns}×${STATE.totalRows}`;
+
+            renderGrid();
+            hideLoading();
+
+            requestAnimationFrame(() => {
+                updateGridDimensions();
+                initializeMarker();
+                elements.infoFooter.classList.add('visible');
+                extractAllFrames();
+            });
+        }
+
+        function renderGrid() {
+            const grid = elements.thumbnailGrid;
+            grid.innerHTML = '';
+            grid.style.gridTemplateColumns = `repeat(${CONFIG.columns}, 1fr)`;
+
+            for (let i = 0; i < STATE.totalCells; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.index = i;
+
+                const loader = document.createElement('div');
+                loader.className = 'cell-loader';
+                cell.appendChild(loader);
+
+                const time = i * CONFIG.secondsPerCell;
+                const label = document.createElement('span');
+                label.className = 'cell-time';
+                label.textContent = formatTimeShort(time);
+                cell.appendChild(label);
+
+                grid.appendChild(cell);
+            }
+        }
+
+        // ==================================================
+        // フレーム抽出
+        // ==================================================
+
+        async function extractAllFrames() {
+            if (!STATE.currentVideoUrl || STATE.isExtracting) return;
+
+            STATE.isExtracting = true;
+            STATE.aborted = false;
+
+            try {
+                if (STATE.frameExtractorVideo) {
+                    STATE.frameExtractorVideo.remove();
+                }
+
+                STATE.frameExtractorVideo = await createExtractorVideo(STATE.currentVideoUrl);
+
+                for (let i = 0; i < STATE.totalCells; i++) {
+                    if (STATE.aborted) break;
+
+                    const timestamp = i * CONFIG.secondsPerCell;
+                    const cell = elements.thumbnailGrid.children[i];
+                    if (!cell) continue;
+
+                    const cached = frameCache.get(STATE.currentVideoUrl, timestamp);
+                    if (cached) {
+                        displayFrame(cell, cached);
+                        continue;
+                    }
+
+                    const frame = await extractFrame(STATE.frameExtractorVideo, timestamp);
+                    if (frame && !STATE.aborted) {
+                        frameCache.put(STATE.currentVideoUrl, timestamp, frame);
+                        displayFrame(cell, frame);
+                    }
+
+                    await new Promise(r => setTimeout(r, 5));
+                }
+            } catch (e) {
+                console.error('Frame extraction error:', e);
+            } finally {
+                STATE.isExtracting = false;
+            }
+        }
+
+        function createExtractorVideo(url) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.style.display = 'none';
+                video.muted = true;
+                video.playsInline = true;
+                video.preload = 'auto';
+                if (url.startsWith('http') && !url.startsWith(location.origin)) {
+                    video.crossOrigin = 'anonymous';
+                }
+                video.src = url;
+
+                const onReady = () => {
+                    video.removeEventListener('loadeddata', onReady);
+                    video.removeEventListener('canplay', onReady);
+                    resolve(video);
+                };
+
+                video.addEventListener('loadeddata', onReady);
+                video.addEventListener('canplay', onReady);
+                video.addEventListener('error', (e) => {
+                    console.error('Video load error:', e);
+                    reject(e);
+                });
+
+                setTimeout(() => {
+                    video.removeEventListener('loadeddata', onReady);
+                    video.removeEventListener('canplay', onReady);
+                    if (video.readyState >= 2) {
+                        resolve(video);
+                    } else {
+                        reject(new Error('Video load timeout'));
+                    }
+                }, 10000);
+
+                document.body.appendChild(video);
+                video.load();
+            });
+        }
+
+        function extractFrame(video, timestamp) {
+            return new Promise(resolve => {
+                if (Math.abs(video.currentTime - timestamp) < 0.1 && video.readyState >= 2) {
+                    resolve(captureFrame(video));
+                    return;
+                }
+
+                let resolved = false;
+
+                const onSeeked = () => {
+                    if (resolved) return;
+                    resolved = true;
+                    video.removeEventListener('seeked', onSeeked);
+                    setTimeout(() => resolve(captureFrame(video)), 50);
+                };
+
+                video.addEventListener('seeked', onSeeked);
+                video.currentTime = Math.min(timestamp, video.duration - 0.1);
+
+                setTimeout(() => {
+                    if (resolved) return;
+                    resolved = true;
+                    video.removeEventListener('seeked', onSeeked);
+                    resolve(captureFrame(video));
+                }, 5000);
+            });
+        }
+
+        function captureFrame(video) {
+            if (video.readyState < 2) return null;
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = CONFIG.thumbWidth;
+                canvas.height = CONFIG.thumbHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                return canvas.toDataURL('image/jpeg', 0.8);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function displayFrame(cell, dataUrl) {
+            const loader = cell.querySelector('.cell-loader');
+            if (loader) loader.remove();
+
+            const existing = cell.querySelector('img');
+            if (existing) existing.remove();
+
+            const img = new Image();
+            img.onload = () => {
+                cell.insertBefore(img, cell.firstChild);
+                requestAnimationFrame(() => img.classList.add('loaded'));
+                cell.classList.add('loaded');
+            };
+            img.src = dataUrl;
+        }
+
+        // ==================================================
+        // マーカー
+        // ==================================================
+
+        function updateGridDimensions() {
+            const grid = elements.thumbnailGrid;
+            const rect = grid.getBoundingClientRect();
+            STATE.gridWidth = rect.width;
+            STATE.gridHeight = rect.height;
+
+            // 実際のセルサイズを取得（gap考慮）
+            const firstCell = grid.querySelector('.grid-cell');
+            if (firstCell) {
+                const cellRect = firstCell.getBoundingClientRect();
+                STATE.cellWidth = cellRect.width;
+                STATE.cellHeight = cellRect.height;
+
+                // gapを計算
+                const gridStyle = getComputedStyle(grid);
+                STATE.gridGap = parseFloat(gridStyle.gap) || 2;
+            } else {
+                STATE.cellWidth = rect.width / CONFIG.columns;
+                STATE.cellHeight = rect.height / STATE.totalRows;
+                STATE.gridGap = 2;
+            }
+        }
+
+        function initializeMarker() {
+            STATE.markerSize = Math.max(24, Math.min(STATE.cellWidth, STATE.cellHeight) * 0.42);
+            elements.svgMarker.style.display = 'block';
+            elements.svgMarker.style.width = `${STATE.markerSize}px`;
+            elements.svgMarker.style.height = `${STATE.markerSize}px`;
+
+            STATE.markerX = 0;
+            STATE.markerY = STATE.cellHeight / 2;
+            STATE.targetX = STATE.markerX;
+            STATE.targetY = STATE.markerY;
+            updateMarkerPosition();
+        }
+
+        function updateMarkerPosition() {
+            const offsetX = STATE.markerSize / 2;
+            const offsetY = STATE.markerSize / 2;
+            elements.svgMarker.style.transform = `translate(${STATE.markerX - offsetX}px, ${STATE.markerY - offsetY}px)`;
+        }
+
+        function moveMarkerTo(x, y, animate = true) {
+            STATE.targetX = Math.max(0, Math.min(x, STATE.gridWidth));
+            STATE.targetY = Math.max(0, Math.min(y, STATE.gridHeight));
+
+            if (animate && !STATE.isAnimating) {
+                STATE.isAnimating = true;
+                animateMarker();
+            } else if (!animate) {
+                STATE.markerX = STATE.targetX;
+                STATE.markerY = STATE.targetY;
+                updateMarkerPosition();
+            }
+        }
+
+        function animateMarker() {
+            const dx = STATE.targetX - STATE.markerX;
+            const dy = STATE.targetY - STATE.markerY;
+
+            if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+                STATE.markerX = STATE.targetX;
+                STATE.markerY = STATE.targetY;
+                STATE.isAnimating = false;
+                updateMarkerPosition();
+                return;
+            }
+
+            STATE.markerX += dx * 0.15;
+            STATE.markerY += dy * 0.15;
+            updateMarkerPosition();
+
+            STATE.animationId = requestAnimationFrame(animateMarker);
+        }
+
+        function calculateMarkerPositionFromTime(currentTime) {
+            if (STATE.totalCells === 0 || CONFIG.secondsPerCell <= 0) {
+                return { x: 0, y: STATE.cellHeight / 2 };
+            }
+
+            const gap = STATE.gridGap || 2;
+            const continuousCellIndex = currentTime / CONFIG.secondsPerCell;
+            let row = Math.floor(continuousCellIndex / CONFIG.columns);
+            row = Math.max(0, Math.min(row, STATE.totalRows - 1));
+
+            const positionInRow = continuousCellIndex - (row * CONFIG.columns);
+            const col = Math.floor(positionInRow);
+            const colFraction = positionInRow - col;
+
+            // X位置: gap考慮
+            const cellPlusGapX = STATE.cellWidth + gap;
+            const x = col * cellPlusGapX + colFraction * STATE.cellWidth;
+
+            // Y位置: gap考慮、セル中央
+            const cellPlusGapY = STATE.cellHeight + gap;
+            const y = row * cellPlusGapY + STATE.cellHeight / 2;
+
+            return {
+                x: Math.max(0, Math.min(x, STATE.gridWidth)),
+                y: Math.max(STATE.cellHeight / 2, Math.min(y, STATE.gridHeight - STATE.cellHeight / 2))
+            };
+        }
+
+        function calculateTimeFromPosition(x, y) {
+            // gap考慮
+            const gap = STATE.gridGap || 2;
+            const cellPlusGap = STATE.cellHeight + gap;
+
+            // Y座標から行を計算
+            const rowContinuous = y / cellPlusGap;
+            const row = Math.max(0, Math.min(Math.floor(rowContinuous), STATE.totalRows - 1));
+
+            // 行内の位置を計算
+            const yInRow = y - row * cellPlusGap;
+            const rowFraction = Math.max(0, Math.min(yInRow / STATE.cellHeight, 1));
+
+            // X座標から列を計算（gap考慮）
+            const cellPlusGapX = STATE.cellWidth + gap;
+            const colContinuous = x / cellPlusGapX;
+            const col = Math.max(0, Math.min(Math.floor(colContinuous), CONFIG.columns - 1));
+            const xInCol = x - col * cellPlusGapX;
+            const colFraction = Math.max(0, Math.min(xInCol / STATE.cellWidth, 1));
+
+            // 連続セルインデックスを計算
+            const continuousCellIndex = row * CONFIG.columns + col + colFraction;
+            const timestamp = continuousCellIndex * CONFIG.secondsPerCell;
+
+            return Math.max(0, Math.min(timestamp, CONFIG.videoDuration));
+        }
+
+        function moveToCell(col, row) {
+            col = Math.max(0, col);
+            row = Math.max(0, row);
+
+            const cellIndex = row * CONFIG.columns + col;
+            const lastIndex = STATE.totalCells - 1;
+
+            if (cellIndex > lastIndex) {
+                row = Math.floor(lastIndex / CONFIG.columns);
+                col = lastIndex % CONFIG.columns;
+            }
+
+            STATE.currentCellX = col;
+            STATE.currentCellY = row;
+
+            const x = col * STATE.cellWidth;
+            const y = (row + 0.5) * STATE.cellHeight;
+            moveMarkerTo(x, y, true);
+
+            const time = (row * CONFIG.columns + col) * CONFIG.secondsPerCell;
+            elements.videoPlayer.currentTime = Math.min(time, CONFIG.videoDuration);
+            updateDisplay();
+            scrollToMarker();
+        }
+
+        function scrollToMarker() {
+            const container = elements.gridContainer;
+            const markerTop = STATE.markerY;
+            const viewportHeight = container.clientHeight;
+            const scrollTop = container.scrollTop;
+
+            if (markerTop < scrollTop + 50) {
+                container.scrollTo({ top: Math.max(0, markerTop - 100), behavior: 'smooth' });
+            } else if (markerTop > scrollTop + viewportHeight - 50) {
+                container.scrollTo({ top: markerTop - viewportHeight + 100, behavior: 'smooth' });
+            }
+        }
+
+        // ==================================================
+        // 表示更新
+        // ==================================================
+
+        function updateDisplay() {
+            const time = elements.videoPlayer.currentTime;
+            elements.currentTime.textContent = formatTime(time);
+            elements.overlayTime.textContent = formatTime(time);
+            elements.overlayCell.textContent = `(${STATE.currentCellX}, ${STATE.currentCellY})`;
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds % 1) * 100);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+        }
+
+        function formatTimeShort(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function showLoading(text) {
+            elements.loadingText.textContent = text;
+            elements.loadingOverlay.classList.add('visible');
+        }
+
+        function hideLoading() {
+            elements.loadingOverlay.classList.remove('visible');
+        }
+
+        // ==================================================
+        // イベント
+        // ==================================================
+
+        function setupEvents() {
+            // グリッドパネル折りたたみ
+            elements.gridToggle.addEventListener('click', () => {
+                const isCollapsed = elements.gridPanel.classList.toggle('collapsed');
+                elements.gridToggle.textContent = isCollapsed ? '▲' : '▼';
+                // グリッドサイズを再計算
+                if (!isCollapsed && STATE.currentVideoUrl) {
+                    setTimeout(updateGridDimensions, 350);
+                }
+            });
+
+            // 左パネル折りたたみ
+            elements.leftPanelToggle.addEventListener('click', () => {
+                const isCollapsed = elements.leftPanel.classList.toggle('collapsed');
+                elements.leftPanelToggle.textContent = isCollapsed ? '▶' : '◀';
+            });
+
+            // ファイル選択
+            elements.uploadDropzone.addEventListener('click', () => elements.fileInput.click());
+            elements.fileInput.addEventListener('change', e => {
+                if (e.target.files[0]) handleFileSelect(e.target.files[0]);
+            });
+
+            // ドラッグ&ドロップ
+            elements.uploadDropzone.addEventListener('dragover', e => {
+                e.preventDefault();
+                elements.uploadDropzone.classList.add('dragover');
+            });
+            elements.uploadDropzone.addEventListener('dragleave', () => {
+                elements.uploadDropzone.classList.remove('dragover');
+            });
+            elements.uploadDropzone.addEventListener('drop', e => {
+                e.preventDefault();
+                elements.uploadDropzone.classList.remove('dragover');
+                if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
+            });
+
+            // 再生コントロール
+            elements.playBtn.addEventListener('click', () => {
+                if (elements.videoPlayer.paused) {
+                    elements.videoPlayer.play();
+                    elements.playBtn.textContent = '⏸ 停止';
+                } else {
+                    elements.videoPlayer.pause();
+                    elements.playBtn.textContent = '▶ 再生';
+                }
+            });
+
+            // 動画イベント
+            let lastScrollTime = 0;
+            elements.videoPlayer.addEventListener('timeupdate', () => {
+                if (!STATE.isDragging) {
+                    const pos = calculateMarkerPositionFromTime(elements.videoPlayer.currentTime);
+                    moveMarkerTo(pos.x, pos.y, true);
+                    updateDisplay();
+
+                    // マーカーに自動スクロール（500msごとにスロットリング）
+                    const now = Date.now();
+                    if (now - lastScrollTime > 500) {
+                        scrollToMarker();
+                        lastScrollTime = now;
+                    }
+                }
+            });
+
+            elements.videoPlayer.addEventListener('play', () => {
+                elements.playBtn.textContent = '⏸ 停止';
+            });
+
+            elements.videoPlayer.addEventListener('pause', () => {
+                elements.playBtn.textContent = '▶ 再生';
+            });
+
+            // グリッド設定
+            elements.regenerateBtn.addEventListener('click', generateThumbnails);
+            elements.columnsSelect.addEventListener('change', () => {
+                if (STATE.currentVideoUrl) generateThumbnails();
+            });
+            elements.intervalSelect.addEventListener('change', () => {
+                if (STATE.currentVideoUrl) generateThumbnails();
+            });
+
+            // グリッド操作（マウス）
+            const grid = elements.thumbnailGrid;
+
+            grid.addEventListener('mousedown', e => {
+                e.preventDefault();
+                STATE.isDragging = true;
+                handleGridInteraction(e.clientX, e.clientY);
+            });
+
+            document.addEventListener('mousemove', e => {
+                if (STATE.isDragging) handleGridInteraction(e.clientX, e.clientY);
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (STATE.isDragging) {
+                    STATE.isDragging = false;
+                    scrollToMarker();
+                }
+            });
+
+            // グリッド操作（タッチ）
+            grid.addEventListener('touchstart', e => {
+                e.preventDefault();
+                STATE.isDragging = true;
+                const touch = e.touches[0];
+                handleGridInteraction(touch.clientX, touch.clientY);
+            }, { passive: false });
+
+            grid.addEventListener('touchmove', e => {
+                if (STATE.isDragging) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    handleGridInteraction(touch.clientX, touch.clientY);
+                }
+            }, { passive: false });
+
+            grid.addEventListener('touchend', () => {
+                if (STATE.isDragging) {
+                    STATE.isDragging = false;
+                    scrollToMarker();
+                }
+            });
+
+            grid.addEventListener('click', handleGridClick);
+
+            // キーボード
+            document.addEventListener('keydown', e => {
+                if (!STATE.currentVideoUrl) return;
+
+                switch (e.key) {
+                    case ' ':
+                        e.preventDefault();
+                        elements.playBtn.click();
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        moveToCell(STATE.currentCellX - 1, STATE.currentCellY);
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        moveToCell(STATE.currentCellX + 1, STATE.currentCellY);
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        moveToCell(STATE.currentCellX, STATE.currentCellY - 1);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        moveToCell(STATE.currentCellX, STATE.currentCellY + 1);
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        moveToCell(0, 0);
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        const lastIdx = STATE.totalCells - 1;
+                        moveToCell(lastIdx % CONFIG.columns, Math.floor(lastIdx / CONFIG.columns));
+                        break;
+                }
+            });
+        }
+
+        function handleGridClick(e) {
+            handleGridInteraction(e.clientX, e.clientY);
+        }
+
+        function handleGridInteraction(clientX, clientY) {
+            const grid = elements.thumbnailGrid;
+            const rect = grid.getBoundingClientRect();
+
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            const clampedX = Math.max(0, Math.min(x, STATE.gridWidth));
+            const clampedY = Math.max(0, Math.min(y, STATE.gridHeight));
+
+            moveMarkerTo(clampedX, clampedY, false);
+
+            const time = calculateTimeFromPosition(clampedX, clampedY);
+
+            // Force video frame update when paused
+            const video = elements.videoPlayer;
+            const wasPaused = video.paused;
+            video.currentTime = time;
+
+            // If video is paused, force frame render by briefly playing
+            if (wasPaused && video.readyState >= 2) {
+                video.play().then(() => {
+                    video.pause();
+                }).catch(() => {
+                    // Ignore autoplay restrictions
+                });
+            }
+
+            STATE.currentCellX = Math.floor(clampedX / STATE.cellWidth);
+            STATE.currentCellY = Math.floor(clampedY / STATE.cellHeight);
+
+            updateDisplay();
+        }
+
+        // ==================================================
+        // 初期化
+        // ==================================================
+
+        setupEvents();
+    </script>
+</body>
+</html>
