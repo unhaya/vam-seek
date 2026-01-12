@@ -1712,6 +1712,11 @@
         }
 
         function scrollToMarker() {
+            // モバイルビュー（768px以下）ではオートスクロールをオフ
+            if (window.innerWidth <= 768) {
+                return;
+            }
+
             const container = elements.gridContainer;
             const markerTop = STATE.targetY;
             const viewportHeight = container.clientHeight;
