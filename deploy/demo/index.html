@@ -779,6 +779,9 @@
             elements.playBtn.disabled = false;
             elements.regenerateBtn.disabled = false;
 
+            // [2025-01-13] 動画切り替え時にグリッドのスクロール位置を先頭にリセット
+            elements.gridContainer.scrollTop = 0;
+
             elements.videoPlayer.addEventListener('loadedmetadata', () => {
                 // [2025-01-13] 動画が切り替わっていないことを確認
                 if (STATE.currentVideoUrl === video.url) {
@@ -827,10 +830,15 @@
             renderGrid();
             hideLoading();
 
+            // [2025-01-13] グリッド再描画後にスクロール位置を先頭にリセット
+            elements.gridContainer.scrollTop = 0;
+
             requestAnimationFrame(() => {
                 updateGridDimensions();
                 initializeMarker();
                 elements.infoFooter.classList.add('visible');
+                // [2025-01-13] requestAnimationFrame後も確実にスクロール位置をリセット
+                elements.gridContainer.scrollTop = 0;
                 extractAllFrames();
             });
         }
