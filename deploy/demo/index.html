@@ -1401,42 +1401,58 @@
                 }
             });
 
-            // Keyboard
+            // Keyboard - use capture phase to intercept before video element
             document.addEventListener('keydown', e => {
                 if (!STATE.currentVideoUrl) return;
 
+                // Block arrow keys from reaching video element
+                if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Home', 'End'].includes(e.key)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+
+                let col = STATE.currentCellX;
+                let row = STATE.currentCellY;
+
                 switch (e.key) {
                     case ' ':
-                        e.preventDefault();
                         elements.playBtn.click();
                         break;
                     case 'ArrowLeft':
-                        e.preventDefault();
-                        moveToCell(STATE.currentCellX - 1, STATE.currentCellY);
+                        if (col > 0) {
+                            col--;
+                        } else if (row > 0) {
+                            // Wrap to previous row's last column
+                            row--;
+                            col = CONFIG.columns - 1;
+                        }
+                        moveToCell(col, row);
                         break;
                     case 'ArrowRight':
-                        e.preventDefault();
-                        moveToCell(STATE.currentCellX + 1, STATE.currentCellY);
+                        if (col < CONFIG.columns - 1) {
+                            col++;
+                        } else if (row < STATE.totalRows - 1) {
+                            // Wrap to next row's first column
+                            row++;
+                            col = 0;
+                        }
+                        moveToCell(col, row);
                         break;
                     case 'ArrowUp':
-                        e.preventDefault();
-                        moveToCell(STATE.currentCellX, STATE.currentCellY - 1);
+                        moveToCell(col, row - 1);
                         break;
                     case 'ArrowDown':
-                        e.preventDefault();
-                        moveToCell(STATE.currentCellX, STATE.currentCellY + 1);
+                        moveToCell(col, row + 1);
                         break;
                     case 'Home':
-                        e.preventDefault();
                         moveToCell(0, 0);
                         break;
                     case 'End':
-                        e.preventDefault();
                         const lastIdx = STATE.totalCells - 1;
                         moveToCell(lastIdx % CONFIG.columns, Math.floor(lastIdx / CONFIG.columns));
                         break;
                 }
-            });
+            }, true);  // Use capture phase to intercept before video element
         }
 
         function handleGridClick(e) {
