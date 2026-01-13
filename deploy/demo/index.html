@@ -1203,10 +1203,10 @@
             // Set manual move flag to prevent timeupdate from overriding position
             STATE.manualMarkerMove = true;
 
-            // Use same gap-aware calculation as calculateMarkerPositionFromTime
+            // Calculate cell center position (gap-aware)
             const gap = STATE.gridGap || 2;
-            const x = col * STATE.cellWidth + col * gap;
-            const y = row * STATE.cellHeight + row * gap + STATE.cellHeight / 2;
+            const x = col * STATE.cellWidth + col * gap + STATE.cellWidth / 2;  // Cell center X
+            const y = row * STATE.cellHeight + row * gap + STATE.cellHeight / 2;  // Cell center Y
             moveMarkerTo(x, y, true);
 
             const time = (row * CONFIG.columns + col) * CONFIG.secondsPerCell;
