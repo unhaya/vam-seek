@@ -262,32 +262,56 @@ video.addEventListener('seeked', () => {
 frameCache.put(timestamp, dataUrl);
 ```
 
-### Multi-Video LRU Cache (2025-01-13)
+### Multi-Video LRU Cache (2026-01-13)
 
 ```javascript
-class FrameCache {
-  constructor(maxFramesPerVideo = 200, maxVideos = 3) {
-    this.caches = new Map(); // videoUrl -> Map(timestamp -> dataUrl)
+class VideoFrameCache {
+  constructor(maxVideos = 3, maxFramesPerVideo = 200) {
+    this.caches = new Map(); // videoUrl -> { frames: Map, complete: boolean }
+    this.maxVideos = maxVideos;
+    this.maxFramesPerVideo = maxFramesPerVideo;
   }
 
   setCurrentVideo(videoUrl) {
     // LRU: Move existing video to end, or create new cache
-    if (this.caches.size >= this.maxVideos) {
-      // Delete oldest video (first entry)
-      const oldestUrl = this.caches.keys().next().value;
-      this.caches.delete(oldestUrl);
+    if (this.caches.has(videoUrl)) {
+      const cache = this.caches.get(videoUrl);
+      this.caches.delete(videoUrl);
+      this.caches.set(videoUrl, cache);
+    } else {
+      if (this.caches.size >= this.maxVideos) {
+        const oldest = this.caches.keys().next().value;
+        this.caches.delete(oldest);
+      }
+      this.caches.set(videoUrl, { frames: new Map(), complete: false });
     }
+  }
+
+  get(videoUrl, timestamp) {
+    const cache = this.caches.get(videoUrl);
+    return cache ? cache.frames.get(timestamp.toFixed(2)) : null;
+  }
+
+  put(videoUrl, timestamp, data) {
+    const cache = this.caches.get(videoUrl);
+    if (cache) cache.frames.set(timestamp.toFixed(2), data);
+  }
+
+  markComplete(videoUrl) {
+    const cache = this.caches.get(videoUrl);
+    if (cache) cache.complete = true;
   }
 }
 
 // Usage: Keeps last 3 videos cached (600 frames total = ~3-6MB)
-const frameCache = new FrameCache(200, 3);
+const frameCache = new VideoFrameCache(3, 200);
 ```
 
 **Benefits:**
 - Switch between videos without re-extracting frames
 - Automatic memory management (oldest video auto-deleted)
 - No race conditions when rapidly switching videos
+- Completion tracking per video
 
 ### VAM Algorithm
 
@@ -325,21 +349,26 @@ Commercial use requires a paid license. Contact: info@haasiy.jp
 
 ## Development History
 
-### 2025-01-13: Multi-Video Cache System
+### 2026-01-13: Grid Scroll Reset & Cache Improvements
+
+- **Grid scroll reset** - Auto-scroll to top when switching videos
+- **VideoFrameCache class** - Enhanced cache with completion tracking
+- **Per-video settings** - Each video remembers columns & interval settings
+
+### 2026-01-13: Multi-Video Cache System
 
 - **LRU video-aware cache** - Manages up to 3 videos intelligently
 - **Race condition fix** - Prevents loading freeze when rapidly switching videos
 - **Memory optimization** - Automatic oldest-video eviction (3-6MB max)
-- **Process abort mechanism** - Clean interruption of frame extraction
-- **Debug logging** - Console logs for cache hits, video switches, extraction progress
+- **Task-based abort mechanism** - Clean interruption of frame extraction with taskId
 
-### 2025-01-10: Library Release
+### 2026-01-10: Library Release
 
 - Standalone `vam-seek.js` for external integration
 - Integration documentation
 - React, Vue examples
 
-### 2025-01-10: Initial Release
+### 2026-01-10: Initial Release
 
 - FastAPI backend with modular architecture
 - Client-side frame extraction (video + canvas)
