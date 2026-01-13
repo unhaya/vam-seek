@@ -161,16 +161,6 @@
 
         #videoPlayer.visible { display: block; }
 
-        .control-bar {
-            height: 48px;
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            gap: 16px;
-        }
-
         .btn {
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
@@ -185,13 +175,6 @@
         .btn:hover { background: var(--accent); border-color: var(--accent); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-primary { background: var(--accent); border-color: var(--accent); }
-
-        .time-display {
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 14px;
-        }
-
-        .time-current { color: var(--highlight); font-weight: bold; }
 
         /* Grid Panel */
         .grid-panel {
@@ -466,18 +449,6 @@
                 </div>
                 <video id="videoPlayer" controls playsinline webkit-playsinline tabindex="-1"></video>
             </div>
-            <div class="control-bar">
-                <button type="button" class="btn" id="playBtn" disabled tabindex="-1">▶ Play</button>
-                <div class="time-display">
-                    <span class="time-current" id="currentTime">00:00.00</span>
-                    <span> / </span>
-                    <span id="totalTime">00:00.00</span>
-                </div>
-                <div style="flex:1"></div>
-                <span style="font-size: 12px; color: var(--text-dim)">
-                    Grid: <span id="gridSizeDisplay">--</span>
-                </span>
-            </div>
         </div>
 
         <!-- Right Panel -->
@@ -652,10 +623,6 @@
             videoList: $('videoList'),
             videoPlayer: $('videoPlayer'),
             playerPlaceholder: $('playerPlaceholder'),
-            playBtn: $('playBtn'),
-            currentTime: $('currentTime'),
-            totalTime: $('totalTime'),
-            gridSizeDisplay: $('gridSizeDisplay'),
             columnsSelect: $('columnsSelect'),
             intervalSelect: $('intervalSelect'),
             regenerateBtn: $('regenerateBtn'),
@@ -777,7 +744,6 @@
             elements.videoPlayer.load();
             elements.videoPlayer.classList.add('visible');
             elements.playerPlaceholder.style.display = 'none';
-            elements.playBtn.disabled = false;
             elements.regenerateBtn.disabled = false;
 
             // [2025-01-13] 動画切り替え時にグリッドのスクロール位置を先頭にリセット
@@ -787,7 +753,6 @@
                 // [2025-01-13] 動画が切り替わっていないことを確認
                 if (STATE.currentVideoUrl === video.url) {
                     CONFIG.videoDuration = elements.videoPlayer.duration;
-                    elements.totalTime.textContent = formatTime(CONFIG.videoDuration);
                     generateThumbnails();
                 }
             }, { once: true });
@@ -825,8 +790,6 @@
 
             STATE.totalRows = config.rows;
             STATE.totalCells = config.totalCells;
-
-            elements.gridSizeDisplay.textContent = `${CONFIG.columns}x${STATE.totalRows}`;
 
             renderGrid();
             hideLoading();
@@ -1240,7 +1203,6 @@
 
         function updateDisplay() {
             const time = elements.videoPlayer.currentTime;
-            elements.currentTime.textContent = formatTime(time);
             elements.overlayTime.textContent = formatTime(time);
             elements.overlayCell.textContent = `(${STATE.currentCellX}, ${STATE.currentCellY})`;
         }
@@ -1308,17 +1270,6 @@
                 if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
             });
 
-            // Play control
-            elements.playBtn.addEventListener('click', () => {
-                if (elements.videoPlayer.paused) {
-                    elements.videoPlayer.play();
-                    elements.playBtn.textContent = '⏸ Pause';
-                } else {
-                    elements.videoPlayer.pause();
-                    elements.playBtn.textContent = '▶ Play';
-                }
-            });
-
             // Video events
             let lastScrollTime = 0;
             elements.videoPlayer.addEventListener('timeupdate', () => {
@@ -1339,14 +1290,6 @@
                         lastScrollTime = now;
                     }
                 }
-            });
-
-            elements.videoPlayer.addEventListener('play', () => {
-                elements.playBtn.textContent = '⏸ Pause';
-            });
-
-            elements.videoPlayer.addEventListener('pause', () => {
-                elements.playBtn.textContent = '▶ Play';
             });
 
             // Grid settings
@@ -1417,7 +1360,11 @@
 
                 switch (e.key) {
                     case ' ':
-                        elements.playBtn.click();
+                        if (elements.videoPlayer.paused) {
+                            elements.videoPlayer.play();
+                        } else {
+                            elements.videoPlayer.pause();
+                        }
                         break;
                     case 'ArrowLeft':
                         if (col > 0) {
