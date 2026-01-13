@@ -2,13 +2,13 @@
 
 2D Video Seek Marker for Video Streaming Sites
 
-## Quick Start (1 Line Integration)
+## Quick Start
 
 ```html
-<script src="https://your-cdn.com/vam-seek.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/unhaya/vam-seek/dist/vam-seek.js"></script>
 ```
 
-That's it. Now connect to your existing `<video>` element:
+Connect to your existing `<video>` element:
 
 ```javascript
 VAMSeek.init({
@@ -17,36 +17,7 @@ VAMSeek.init({
 });
 ```
 
-## Why VAM Seek?
-
-| Problem | VAM Seek Solution |
-|---------|------------------|
-| Users scrub randomly to find scenes | Visual grid shows all thumbnails at once |
-| Seek bar is 1-dimensional | 2D grid = faster navigation |
-| Mobile scrubbing is imprecise | Click any cell to jump instantly |
-| Server load for thumbnail generation | **Client-side extraction** - zero server CPU |
-
-## Architecture
-
-```
-Your Video Site                    VAM Seek Library (Client-Side)
-+------------------+               +---------------------------+
-|                  |               |                           |
-|  <video src="">  | ───────────>  |  LRU Frame Cache (200)    |
-|                  |               |  Canvas Frame Extraction  |
-|  Your CDN/S3     |               |  2D Grid Rendering        |
-|                  |               |  Smooth Marker Animation  |
-+------------------+               +---------------------------+
-        │                                      │
-        │                                      │
-        v                                      v
-   No server-side                    All computation
-   processing needed                 happens in browser
-```
-
-## Full Integration Example
-
-### HTML Structure
+## Full Example
 
 ```html
 <!DOCTYPE html>
@@ -91,7 +62,7 @@ Your Video Site                    VAM Seek Library (Client-Side)
     </div>
 
     <!-- VAM Seek Library -->
-    <script src="https://your-cdn.com/vam-seek.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/unhaya/vam-seek/dist/vam-seek.js"></script>
     <script>
         const video = document.getElementById('myVideo');
         const grid = document.getElementById('seekGrid');
@@ -301,48 +272,6 @@ Access-Control-Allow-Origin: *
 
 Or serve the video and page from the same origin.
 
-## CDN Hosting
-
-Host `vam-seek.js` on your CDN:
-
-```html
-<!-- jsDelivr (recommended) -->
-<script src="https://cdn.jsdelivr.net/gh/unhaya/vam-seek@1.0.0/dist/vam-seek.js"></script>
-
-<!-- unpkg -->
-<script src="https://unpkg.com/vam-seek@1.0.0/dist/vam-seek.js"></script>
-
-<!-- Your own CDN -->
-<script src="https://cdn.your-site.com/lib/vam-seek.js"></script>
-```
-
-## TypeScript Support
-
-Type definitions (coming soon):
-
-```typescript
-interface VAMSeekOptions {
-    video: HTMLVideoElement;
-    container: HTMLElement;
-    columns?: number;
-    secondsPerCell?: number;
-    thumbWidth?: number;
-    thumbHeight?: number;
-    cacheSize?: number;
-    markerSvg?: string;
-    onSeek?: (time: number, cell: CellInfo) => void;
-}
-
-interface CellInfo {
-    index: number;
-    col: number;
-    row: number;
-    time: number;
-    cellStartTime: number;
-    cellEndTime: number;
-}
-```
-
 ## License
 
 Free for personal, educational, and research use.
@@ -350,9 +279,4 @@ Commercial use requires a paid license. Contact: info@haasiy.jp
 
 ## Support
 
-- GitHub Issues: https://github.com/unhaya/vam-seek/issues
-- Documentation: https://unhaya.github.io/vam-seek/
-
----
-
-**VAM Seek** - Navigate videos visually.
+GitHub Issues: https://github.com/unhaya/vam-seek/issues
