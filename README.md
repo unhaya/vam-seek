@@ -125,9 +125,7 @@ Commercial use requires a paid license. Contact: info@haasiy.jp
 ## Development History
 
 ### 2026-01-14: v1.1.1
-- Library behavior matches demo exactly
 - Added test page - [Try it](https://haasiy.main.jp/vam_web/html/test.html)
-- Center-following auto-scroll
 
 ### 2026-01-13: Multi-Video Support
 - LRU cache for up to 3 videos (instant switching)
