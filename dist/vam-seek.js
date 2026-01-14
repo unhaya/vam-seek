@@ -135,7 +135,8 @@
                 isAnimating: false,
                 animationId: null,
                 extractorVideo: null,
-                taskId: 0,  // Task-based abort management (like demo)
+                currentTaskId: 0,  // Task counter (always increments)
+                activeTaskId: null,  // Currently valid task ID (null = no active task)
                 lastScrollTime: 0,
                 scrollAnimationId: null
             };
@@ -247,8 +248,8 @@
         rebuild() {
             if (!this.video.duration) return;
 
-            // Abort any ongoing extraction (task-based, like demo)
-            this.state.taskId = (this.state.taskId || 0) + 1;
+            // Abort any ongoing extraction (like demo's generateThumbnails)
+            this.state.activeTaskId = null;
 
             // Multi-video cache: don't clear, just use cached frames if available
 
@@ -318,7 +319,7 @@
          */
         destroy() {
             // Invalidate current task to stop extraction
-            this.state.taskId++;
+            this.state.activeTaskId = null;
             if (this.state.animationId) {
                 cancelAnimationFrame(this.state.animationId);
             }
@@ -456,15 +457,16 @@
         // ==========================================
 
         async _extractAllFrames() {
-            // Task-based abort management (like demo)
-            const myTaskId = this.state.taskId;
+            // Task-based abort management (like demo's extractAllFrames)
+            const taskId = ++this.state.currentTaskId;
+            this.state.activeTaskId = taskId;
             const targetVideoSrc = this.video.src;
             // Capture config at task start (like demo's CONFIG)
             const taskSecondsPerCell = this.secondsPerCell;
             const taskTotalCells = this.state.totalCells;
 
-            // Helper to check if this task is still valid
-            const isTaskValid = () => this.state.taskId === myTaskId && this.video.src === targetVideoSrc;
+            // Helper to check if this task is still valid (like demo)
+            const isTaskValid = () => this.state.activeTaskId === taskId && this.video.src === targetVideoSrc;
 
             try {
                 // Cleanup previous extractor video
