@@ -1184,17 +1184,44 @@
             }, 100);
         }
 
+        // Smooth scroll animation state
+        let scrollAnimationId = null;
+
         function scrollToMarker() {
             const container = elements.gridContainer;
             const viewportHeight = container.clientHeight;
+            const targetScroll = Math.max(0, STATE.markerY - viewportHeight / 2);
+            const start = container.scrollTop;
+            const distance = targetScroll - start;
 
-            // Center-following scroll (VAM 5.70 style)
-            // Marker always stays at viewport center
-            const targetScroll = STATE.markerY - viewportHeight / 2;
-            container.scrollTo({
-                top: Math.max(0, targetScroll),
-                behavior: 'smooth'
-            });
+            // Skip if already at target
+            if (Math.abs(distance) < 1) return;
+
+            // Cancel any ongoing animation
+            if (scrollAnimationId) {
+                cancelAnimationFrame(scrollAnimationId);
+            }
+
+            const duration = 400; // 400ms like VAM 5.70
+            let startTime = null;
+
+            function animate(currentTime) {
+                if (!startTime) startTime = currentTime;
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // OutCubic easing (same as VAM 5.70)
+                const eased = 1 - Math.pow(1 - progress, 3);
+                container.scrollTop = start + distance * eased;
+
+                if (progress < 1) {
+                    scrollAnimationId = requestAnimationFrame(animate);
+                } else {
+                    scrollAnimationId = null;
+                }
+            }
+
+            scrollAnimationId = requestAnimationFrame(animate);
         }
 
         // ==================================================
