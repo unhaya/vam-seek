@@ -1,0 +1,13 @@
+{
+  "name": "vam-seek",
+  "version": "0.0.1",
+  "description": "2D video seek grid library - client-side thumbnail extraction",
+  "main": "dist/vam-seek.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unhaya/vam-seek"
+  },
+  "keywords": ["video", "seek", "thumbnail", "grid", "player"],
+  "author": "unhaya",
+  "license": "SEE LICENSE IN LICENSE"
+}

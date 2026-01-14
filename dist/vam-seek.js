@@ -494,13 +494,39 @@
                 const video = document.createElement('video');
                 video.style.display = 'none';
                 video.muted = true;
+                video.playsInline = true;
                 video.preload = 'auto';
-                video.src = this.video.src;
 
-                video.addEventListener('loadeddata', () => resolve(video));
+                const url = this.video.src;
+                // Set crossOrigin only for external URLs (same as demo)
+                if (url.startsWith('http') && !url.startsWith(location.origin)) {
+                    video.crossOrigin = 'anonymous';
+                }
+                video.src = url;
+
+                const onReady = () => {
+                    video.removeEventListener('loadeddata', onReady);
+                    video.removeEventListener('canplay', onReady);
+                    resolve(video);
+                };
+
+                video.addEventListener('loadeddata', onReady);
+                video.addEventListener('canplay', onReady);
                 video.addEventListener('error', reject);
 
+                // Timeout: 10 seconds (same as demo)
+                setTimeout(() => {
+                    video.removeEventListener('loadeddata', onReady);
+                    video.removeEventListener('canplay', onReady);
+                    if (video.readyState >= 2) {
+                        resolve(video);
+                    } else {
+                        reject(new Error('Video load timeout'));
+                    }
+                }, 10000);
+
                 document.body.appendChild(video);
+                video.load();
             });
         }
 
@@ -515,22 +541,43 @@
                     return;
                 }
 
-                const onSeeked = () => {
-                    video.removeEventListener('seeked', onSeeked);
+                // Optimization: if already at position, capture immediately
+                if (Math.abs(video.currentTime - timestamp) < 0.1 && video.readyState >= 2) {
                     const frame = this._captureFrame(video);
                     if (frame) {
                         this.frameCache.put(this.video.src, timestamp, frame);
                     }
                     resolve(frame);
+                    return;
+                }
+
+                let resolved = false;
+                const onSeeked = () => {
+                    if (resolved) return;
+                    resolved = true;
+                    video.removeEventListener('seeked', onSeeked);
+                    // Wait 50ms after seeked for stable frame (matches demo)
+                    setTimeout(() => {
+                        const frame = this._captureFrame(video);
+                        if (frame) {
+                            this.frameCache.put(this.video.src, timestamp, frame);
+                        }
+                        resolve(frame);
+                    }, 50);
                 };
 
                 video.addEventListener('seeked', onSeeked);
-                video.currentTime = timestamp;
+                // Clip timestamp to avoid end-of-video issues (matches demo)
+                video.currentTime = Math.min(timestamp, video.duration - 0.1);
 
                 setTimeout(() => {
+                    if (resolved) return;
+                    resolved = true;
                     video.removeEventListener('seeked', onSeeked);
-                    resolve(null);
-                }, 3000);
+                    // Fallback: try to capture anyway
+                    const frame = this._captureFrame(video);
+                    resolve(frame);
+                }, 5000);
             });
         }
 
