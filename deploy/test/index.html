@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAM Seek Library Test</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0a12;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #7c5cff;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .video-section {
+            flex: 1;
+            max-width: 700px;
+        }
+        .grid-section {
+            width: 400px;
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        video {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+        }
+        .controls {
+            margin-top: 15px;
+            padding: 15px;
+            background: #1a1a2e;
+            border-radius: 8px;
+        }
+        .controls label {
+            display: block;
+            margin-bottom: 10px;
+        }
+        .controls select, .controls input[type="file"] {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #333;
+            background: #0a0a12;
+            color: #e0e0e0;
+            width: 100%;
+            margin-top: 5px;
+        }
+        .grid-container {
+            height: 500px;
+            overflow-y: auto;
+            position: relative;
+        }
+        .info {
+            margin-top: 15px;
+            padding: 10px;
+            background: #0a0a12;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .info span {
+            display: block;
+            margin: 3px 0;
+        }
+        .status {
+            color: #7c5cff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>VAM Seek Library Test (v1.1.1)</h1>
+
+    <div class="container">
+        <div class="video-section">
+            <video id="testVideo" controls></video>
+
+            <div class="controls">
+                <label>
+                    Select Video:
+                    <input type="file" id="fileInput" accept="video/*">
+                </label>
+
+                <label>
+                    Columns:
+                    <select id="columnsSelect">
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5" selected>5</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                    </select>
+                </label>
+
+                <label>
+                    Seconds per Cell:
+                    <select id="intervalSelect">
+                        <option value="5">5s</option>
+                        <option value="10">10s</option>
+                        <option value="15" selected>15s</option>
+                        <option value="30">30s</option>
+                        <option value="60">60s</option>
+                    </select>
+                </label>
+
+                <label>
+                    Scroll Behavior:
+                    <select id="scrollBehaviorSelect">
+                        <option value="center" selected>Center-following</option>
+                        <option value="edge">Edge-trigger</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="info">
+                <span class="status" id="statusText">Waiting for video...</span>
+                <span id="timeInfo">Time: --:--</span>
+                <span id="cellInfo">Cell: (-, -)</span>
+                <span id="cacheInfo">Cache: 0 frames</span>
+            </div>
+        </div>
+
+        <div class="grid-section">
+            <h3 style="margin-bottom: 10px;">Thumbnail Grid</h3>
+            <div class="grid-container" id="gridContainer"></div>
+        </div>
+    </div>
+
+    <!-- VAM Seek Library -->
+    <script src="../../dist/vam-seek.js"></script>
+
+    <script>
+        const video = document.getElementById('testVideo');
+        const gridContainer = document.getElementById('gridContainer');
+        const fileInput = document.getElementById('fileInput');
+        const columnsSelect = document.getElementById('columnsSelect');
+        const intervalSelect = document.getElementById('intervalSelect');
+        const scrollBehaviorSelect = document.getElementById('scrollBehaviorSelect');
+        const statusText = document.getElementById('statusText');
+        const timeInfo = document.getElementById('timeInfo');
+        const cellInfo = document.getElementById('cellInfo');
+        const cacheInfo = document.getElementById('cacheInfo');
+
+        let vamInstance = null;
+
+        // File selection
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const url = URL.createObjectURL(file);
+            video.src = url;
+            statusText.textContent = 'Loading video...';
+        });
+
+        // Video loaded
+        video.addEventListener('loadedmetadata', () => {
+            statusText.textContent = 'Initializing VAM Seek...';
+
+            // Destroy previous instance
+            if (vamInstance) {
+                vamInstance.destroy();
+            }
+
+            // Initialize VAM Seek
+            vamInstance = VAMSeek.init({
+                video: video,
+                container: gridContainer,
+                columns: parseInt(columnsSelect.value),
+                secondsPerCell: parseInt(intervalSelect.value),
+                autoScroll: true,
+                scrollBehavior: scrollBehaviorSelect.value,
+                onSeek: (time, cell) => {
+                    console.log(`Seeked to ${time.toFixed(2)}s (cell ${cell.index})`);
+                }
+            });
+
+            statusText.textContent = `VAM Seek initialized (v${VAMSeek.version})`;
+            console.log('VAM Seek instance:', vamInstance);
+        });
+
+        // Update display
+        video.addEventListener('timeupdate', () => {
+            if (!vamInstance) return;
+
+            const time = video.currentTime;
+            const mins = Math.floor(time / 60);
+            const secs = Math.floor(time % 60);
+            timeInfo.textContent = `Time: ${mins}:${secs.toString().padStart(2, '0')}`;
+
+            const cell = vamInstance.getCurrentCell();
+            cellInfo.textContent = `Cell: (${cell.col}, ${cell.row})`;
+        });
+
+        // Settings change
+        columnsSelect.addEventListener('change', () => {
+            if (vamInstance) {
+                vamInstance.configure({
+                    columns: parseInt(columnsSelect.value)
+                });
+            }
+        });
+
+        intervalSelect.addEventListener('change', () => {
+            if (vamInstance) {
+                vamInstance.configure({
+                    secondsPerCell: parseInt(intervalSelect.value)
+                });
+            }
+        });
+
+        scrollBehaviorSelect.addEventListener('change', () => {
+            if (vamInstance) {
+                vamInstance.scrollBehavior = scrollBehaviorSelect.value;
+                statusText.textContent = `Scroll: ${scrollBehaviorSelect.value}`;
+            }
+        });
+
+        // Keyboard shortcuts info
+        console.log('Keyboard shortcuts:');
+        console.log('  Arrow keys: Move marker');
+        console.log('  Space: Play/Pause');
+        console.log('  Home: First cell');
+        console.log('  End: Last cell');
+    </script>
+</body>
+</html>

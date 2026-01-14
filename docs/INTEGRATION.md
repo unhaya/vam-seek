@@ -94,9 +94,11 @@ VAMSeek.init({
 | `secondsPerCell` | number | 5 | Seconds each cell represents |
 | `thumbWidth` | number | 160 | Thumbnail width in pixels |
 | `thumbHeight` | number | 90 | Thumbnail height in pixels |
-| `cacheSize` | number | 200 | LRU cache size (frames) |
+| `cacheSize` | number | 200 | LRU cache size (frames per video) |
 | `markerSvg` | string | null | Custom marker SVG HTML |
 | `onSeek` | function | null | Callback when user seeks |
+| `autoScroll` | boolean | true | Enable auto-scroll during playback |
+| `scrollBehavior` | string | 'center' | Scroll mode: 'center' or 'edge' |
 
 ## API Reference
 

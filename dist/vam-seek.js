@@ -1,7 +1,7 @@
 /**
  * VAM Seek - 2D Video Seek Marker Library
  *
- * @version 1.0.0
+ * @version 1.1.1
  * @license MIT
  * @author VAM Project
  *
@@ -21,46 +21,84 @@
     'use strict';
 
     // ==========================================
-    // LRU Frame Cache
+    // Multi-Video LRU Cache Manager (up to 3 videos)
     // ==========================================
-    class FrameCache {
-        constructor(maxSize = 200) {
-            this.cache = new Map();
-            this.maxSize = maxSize;
+    class MultiVideoCache {
+        constructor(maxVideos = 3, framesPerVideo = 200) {
+            this.maxVideos = maxVideos;
+            this.framesPerVideo = framesPerVideo;
+            this.videoOrder = []; // LRU order
+            this.caches = new Map(); // videoSrc -> FrameCache
         }
 
-        _key(videoSrc, timestamp) {
-            return `${videoSrc}@${timestamp.toFixed(2)}`;
+        _getOrCreateCache(videoSrc) {
+            if (!this.caches.has(videoSrc)) {
+                // Evict oldest video if at capacity
+                if (this.videoOrder.length >= this.maxVideos) {
+                    const oldest = this.videoOrder.shift();
+                    this.caches.delete(oldest);
+                }
+                this.caches.set(videoSrc, new Map());
+                this.videoOrder.push(videoSrc);
+            } else {
+                // Move to end (most recently used)
+                const idx = this.videoOrder.indexOf(videoSrc);
+                if (idx !== -1) {
+                    this.videoOrder.splice(idx, 1);
+                    this.videoOrder.push(videoSrc);
+                }
+            }
+            return this.caches.get(videoSrc);
         }
 
         get(videoSrc, timestamp) {
-            const key = this._key(videoSrc, timestamp);
-            if (!this.cache.has(key)) return null;
-            const value = this.cache.get(key);
-            this.cache.delete(key);
-            this.cache.set(key, value);
+            const cache = this.caches.get(videoSrc);
+            if (!cache) return null;
+            const key = timestamp.toFixed(2);
+            if (!cache.has(key)) return null;
+            // LRU: move to end
+            const value = cache.get(key);
+            cache.delete(key);
+            cache.set(key, value);
             return value;
         }
 
         put(videoSrc, timestamp, imageData) {
-            const key = this._key(videoSrc, timestamp);
-            if (this.cache.has(key)) {
-                this.cache.delete(key);
-            } else if (this.cache.size >= this.maxSize) {
-                const firstKey = this.cache.keys().next().value;
-                this.cache.delete(firstKey);
+            const cache = this._getOrCreateCache(videoSrc);
+            const key = timestamp.toFixed(2);
+            if (cache.has(key)) {
+                cache.delete(key);
+            } else if (cache.size >= this.framesPerVideo) {
+                const firstKey = cache.keys().next().value;
+                cache.delete(firstKey);
             }
-            this.cache.set(key, imageData);
+            cache.set(key, imageData);
+        }
+
+        hasVideo(videoSrc) {
+            return this.caches.has(videoSrc);
+        }
+
+        getVideoCache(videoSrc) {
+            return this.caches.get(videoSrc);
         }
 
         clear() {
-            this.cache.clear();
+            this.caches.clear();
+            this.videoOrder = [];
         }
 
         get size() {
-            return this.cache.size;
+            let total = 0;
+            for (const cache of this.caches.values()) {
+                total += cache.size;
+            }
+            return total;
         }
     }
+
+    // Global shared cache for all instances
+    const globalCache = new MultiVideoCache(3, 200);
 
     // ==========================================
     // VAM Seek Main Class
@@ -76,8 +114,11 @@
             this.markerSvg = options.markerSvg || null;
             this.onSeek = options.onSeek || null;
             this.onCellClick = options.onCellClick || null;
+            this.autoScroll = options.autoScroll !== false; // Default: true
+            this.scrollBehavior = options.scrollBehavior || 'center'; // 'center' or 'edge'
 
-            this.frameCache = new FrameCache(options.cacheSize || 200);
+            // Use global multi-video cache
+            this.frameCache = globalCache;
             this.state = {
                 rows: 0,
                 totalCells: 0,
@@ -85,6 +126,7 @@
                 gridHeight: 0,
                 cellWidth: 0,
                 cellHeight: 0,
+                gridGap: 2,  // Grid gap between cells
                 markerX: 0,
                 markerY: 0,
                 targetX: 0,
@@ -94,7 +136,9 @@
                 animationId: null,
                 extractorVideo: null,
                 isExtracting: false,
-                aborted: false
+                aborted: false,
+                lastScrollTime: 0,
+                scrollAnimationId: null
             };
 
             this.grid = null;
@@ -106,6 +150,11 @@
             this._createGrid();
             this._createMarker();
             this._bindEvents();
+
+            // If video duration is already available, build grid immediately
+            if (this.video.duration) {
+                this.rebuild();
+            }
         }
 
         _createGrid() {
@@ -159,10 +208,31 @@
             this.video.addEventListener('timeupdate', () => this._onTimeUpdate());
             this.video.addEventListener('loadedmetadata', () => this.rebuild());
 
-            // Grid interactions
+            // Grid interactions - Mouse
             this.grid.addEventListener('mousedown', (e) => this._onMouseDown(e));
             document.addEventListener('mousemove', (e) => this._onMouseMove(e));
             document.addEventListener('mouseup', () => this._onMouseUp());
+
+            // Grid interactions - Touch (same as demo)
+            this.grid.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.state.isDragging = true;
+                this._handleMousePosition(e.touches[0]);
+            }, { passive: false });
+
+            this.grid.addEventListener('touchmove', (e) => {
+                if (this.state.isDragging) {
+                    e.preventDefault();
+                    this._handleMousePosition(e.touches[0]);
+                }
+            }, { passive: false });
+
+            this.grid.addEventListener('touchend', () => {
+                if (this.state.isDragging) {
+                    this.state.isDragging = false;
+                    this._scrollToMarker();
+                }
+            });
 
             // Keyboard
             document.addEventListener('keydown', (e) => this._onKeyDown(e));
@@ -180,8 +250,7 @@
 
             this.state.aborted = true;
 
-            // ① Clear frame cache for new video (keep only current video's cache)
-            this.frameCache.clear();
+            // Multi-video cache: don't clear, just use cached frames if available
 
             this._calculateGridSize();
             this._renderGrid();
@@ -213,22 +282,32 @@
         }
 
         /**
-         * Move marker to cell
+         * Move marker to cell (same as demo)
          */
         moveToCell(col, row) {
-            col = Math.max(0, Math.min(col, this.columns - 1));
-            row = Math.max(0, Math.min(row, this.state.rows - 1));
+            col = Math.max(0, col);
+            row = Math.max(0, row);
 
             const cellIndex = row * this.columns + col;
-            if (cellIndex >= this.state.totalCells) return;
+            const lastIndex = this.state.totalCells - 1;
 
-            // Position marker and playback at cell center for better UX
-            const x = (col + 0.5) * this.state.cellWidth;
-            const y = (row + 0.5) * this.state.cellHeight;
+            if (cellIndex > lastIndex) {
+                row = Math.floor(lastIndex / this.columns);
+                col = lastIndex % this.columns;
+            }
+
+            // Calculate cell center position (gap-aware, same as demo)
+            const gap = this.state.gridGap || 2;
+            const x = col * this.state.cellWidth + col * gap + this.state.cellWidth / 2;  // Cell center X
+            const y = row * this.state.cellHeight + row * gap + this.state.cellHeight / 2;  // Cell center Y
             this._moveMarkerTo(x, y, true);
 
-            const time = (cellIndex + 0.5) * this.secondsPerCell;
-            this.seekTo(time);
+            // Set time to cell center (add 0.5 cell) so marker stays centered after timeupdate
+            const time = (row * this.columns + col + 0.5) * this.secondsPerCell;
+            this.seekTo(Math.min(time, this.video.duration));
+
+            // Auto-scroll to marker position
+            this._scrollToMarker();
         }
 
         /**
@@ -239,10 +318,13 @@
             if (this.state.animationId) {
                 cancelAnimationFrame(this.state.animationId);
             }
+            if (this.state.scrollAnimationId) {
+                cancelAnimationFrame(this.state.scrollAnimationId);
+            }
             if (this.state.extractorVideo) {
                 this.state.extractorVideo.remove();
             }
-            this.frameCache.clear();
+            // Don't clear global cache on destroy
             this.grid.remove();
             this.marker.remove();
         }
@@ -344,8 +426,22 @@
             const rect = this.grid.getBoundingClientRect();
             this.state.gridWidth = rect.width;
             this.state.gridHeight = rect.height;
-            this.state.cellWidth = rect.width / this.columns;
-            this.state.cellHeight = rect.height / this.state.rows;
+
+            // Get actual cell dimensions from first cell (like demo)
+            const firstCell = this.grid.querySelector('.vam-cell');
+            if (firstCell) {
+                const cellRect = firstCell.getBoundingClientRect();
+                this.state.cellWidth = cellRect.width;
+                this.state.cellHeight = cellRect.height;
+
+                // Calculate gap from grid computed style
+                const gridStyle = getComputedStyle(this.grid);
+                this.state.gridGap = parseFloat(gridStyle.gap) || 2;
+            } else {
+                this.state.cellWidth = rect.width / this.columns;
+                this.state.cellHeight = rect.height / this.state.rows;
+                this.state.gridGap = 2;
+            }
         }
 
         // ==========================================
@@ -486,8 +582,9 @@
 
         _initMarker() {
             this.marker.style.display = 'block';
+            // Initialize at first cell center (same as demo)
             this.state.markerX = 0;
-            this.state.markerY = 0;
+            this.state.markerY = this.state.cellHeight / 2;
             this.state.targetX = this.state.markerX;
             this.state.targetY = this.state.markerY;
             this._updateMarkerPosition();
@@ -531,40 +628,128 @@
             this.marker.style.transform = `translate(${this.state.markerX}px, ${this.state.markerY}px) translate(-50%, -50%)`;
         }
 
+        // ==========================================
+        // Auto-Scroll (Center-Following with Smooth Animation)
+        // ==========================================
+
+        /**
+         * Scroll container to keep marker visible
+         * Uses center-following by default (VAM 5.70 style)
+         */
+        _scrollToMarker() {
+            if (!this.autoScroll) return;
+
+            const viewportHeight = this.container.clientHeight;
+
+            if (this.scrollBehavior === 'edge') {
+                // Edge-trigger: only scroll when marker reaches screen edge
+                const scrollTop = this.container.scrollTop;
+                if (this.state.markerY < scrollTop + 50) {
+                    this._smoothScrollTo(Math.max(0, this.state.markerY - 100));
+                } else if (this.state.markerY > scrollTop + viewportHeight - 50) {
+                    this._smoothScrollTo(this.state.markerY - viewportHeight + 100);
+                }
+            } else {
+                // Center-following (default): marker stays at viewport center
+                const targetScroll = Math.max(0, this.state.markerY - viewportHeight / 2);
+                this._smoothScrollTo(targetScroll);
+            }
+        }
+
+        /**
+         * Smooth scroll animation using requestAnimationFrame
+         * 400ms duration with OutCubic easing (same as VAM 5.70)
+         */
+        _smoothScrollTo(targetScroll) {
+            const start = this.container.scrollTop;
+            const distance = targetScroll - start;
+
+            // Skip if already at target
+            if (Math.abs(distance) < 1) return;
+
+            // Cancel any ongoing animation
+            if (this.state.scrollAnimationId) {
+                cancelAnimationFrame(this.state.scrollAnimationId);
+            }
+
+            const duration = 400; // 400ms like VAM 5.70
+            let startTime = null;
+            const container = this.container;
+            const state = this.state;
+
+            function animate(currentTime) {
+                if (!startTime) startTime = currentTime;
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // OutCubic easing (same as VAM 5.70's QPropertyAnimation)
+                const eased = 1 - Math.pow(1 - progress, 3);
+                container.scrollTop = start + distance * eased;
+
+                if (progress < 1) {
+                    state.scrollAnimationId = requestAnimationFrame(animate);
+                } else {
+                    state.scrollAnimationId = null;
+                }
+            }
+
+            this.state.scrollAnimationId = requestAnimationFrame(animate);
+        }
+
         /**
          * Calculate marker position from playback time
-         * VAM Algorithm: calculate_position_from_playback
+         * VAM Algorithm: calculate_position_from_playback (same as demo)
          */
         _calculatePositionFromTime(time) {
             if (this.state.totalCells === 0 || this.secondsPerCell <= 0) {
-                return { x: 0, y: 0 };
+                return { x: 0, y: this.state.cellHeight / 2 };
             }
 
+            const gap = this.state.gridGap || 2;
             const continuousCellIndex = time / this.secondsPerCell;
             let row = Math.floor(continuousCellIndex / this.columns);
             row = Math.max(0, Math.min(row, this.state.rows - 1));
 
             const positionInRow = continuousCellIndex - (row * this.columns);
-            const x = positionInRow * this.state.cellWidth;
-            const y = row * this.state.cellHeight;
+            let col = Math.floor(positionInRow);
+            col = Math.max(0, Math.min(col, this.columns - 1));
+            const colFraction = Math.max(0, Math.min(positionInRow - col, 1));
+
+            // X position: col cells + col gaps + fraction within current cell
+            const x = col * this.state.cellWidth + col * gap + colFraction * this.state.cellWidth;
+
+            // Y position: row cells + row gaps, centered in cell (cellHeight / 2)
+            const y = row * this.state.cellHeight + row * gap + this.state.cellHeight / 2;
 
             return {
                 x: Math.max(0, Math.min(x, this.state.gridWidth)),
-                y: Math.max(0, Math.min(y, this.state.gridHeight))
+                y: Math.max(this.state.cellHeight / 2, Math.min(y, this.state.gridHeight - this.state.cellHeight / 2))
             };
         }
 
         /**
          * Calculate timestamp from marker position
-         * VAM Algorithm: calculate_x_continuous_timestamp
+         * VAM Algorithm: calculate_x_continuous_timestamp (same as demo)
          */
         _calculateTimeFromPosition(x, y) {
-            const relX = x / this.state.gridWidth;
-            const relY = y / this.state.gridHeight;
+            // Account for gap between cells (same as demo)
+            const gap = this.state.gridGap || 2;
+            const cellPlusGapY = this.state.cellHeight + gap;
 
-            const rowIndex = Math.floor(relY * this.state.rows);
-            const colContinuous = relX * this.columns;
-            const continuousCellIndex = rowIndex * this.columns + colContinuous;
+            // Calculate row from Y - subtract half cell height to account for center offset
+            const yAdjusted = y - this.state.cellHeight / 2;
+            const rowContinuous = yAdjusted / cellPlusGapY;
+            const row = Math.max(0, Math.min(Math.floor(rowContinuous + 0.5), this.state.rows - 1));
+
+            // Calculate column from X (account for gap)
+            const cellPlusGapX = this.state.cellWidth + gap;
+            const colContinuous = x / cellPlusGapX;
+            const col = Math.max(0, Math.min(Math.floor(colContinuous), this.columns - 1));
+            const xInCol = x - col * cellPlusGapX;
+            const colFraction = Math.max(0, Math.min(xInCol / this.state.cellWidth, 1));
+
+            // Calculate continuous cell index
+            const continuousCellIndex = row * this.columns + col + colFraction;
             const timestamp = continuousCellIndex * this.secondsPerCell;
 
             return Math.max(0, Math.min(timestamp, this.video.duration));
@@ -579,6 +764,15 @@
 
             const pos = this._calculatePositionFromTime(this.video.currentTime);
             this._moveMarkerTo(pos.x, pos.y, true);
+
+            // Auto-scroll with throttling (500ms interval)
+            if (this.autoScroll && !this.video.paused) {
+                const now = Date.now();
+                if (now - this.state.lastScrollTime > 500) {
+                    this._scrollToMarker();
+                    this.state.lastScrollTime = now;
+                }
+            }
         }
 
         _onMouseDown(e) {
@@ -595,13 +789,15 @@
         _onMouseUp() {
             if (this.state.isDragging) {
                 this.state.isDragging = false;
+                this._scrollToMarker();
             }
         }
 
         _handleMousePosition(e) {
             const rect = this.grid.getBoundingClientRect();
+            // Same as demo: no scroll offset added (rect.top is already viewport relative)
             const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top + this.container.scrollTop;
+            const y = e.clientY - rect.top;
 
             const clampedX = Math.max(0, Math.min(x, this.state.gridWidth));
             const clampedY = Math.max(0, Math.min(y, this.state.gridHeight));
@@ -685,9 +881,11 @@
          * @param {number} [options.secondsPerCell=15] - Seconds per cell
          * @param {number} [options.thumbWidth=160] - Thumbnail width
          * @param {number} [options.thumbHeight=90] - Thumbnail height
-         * @param {number} [options.cacheSize=200] - LRU cache size
+         * @param {number} [options.cacheSize=200] - LRU cache size per video
          * @param {string} [options.markerSvg] - Custom marker SVG
          * @param {Function} [options.onSeek] - Callback on seek
+         * @param {boolean} [options.autoScroll=true] - Enable auto-scroll during playback
+         * @param {string} [options.scrollBehavior='center'] - Scroll behavior: 'center' or 'edge'
          * @returns {VAMSeekInstance}
          */
         init: function(options) {
@@ -721,7 +919,7 @@
         /**
          * Library version
          */
-        version: '1.0.0'
+        version: '1.1.1'
     };
 
 })(typeof window !== 'undefined' ? window : this);
