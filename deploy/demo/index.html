@@ -1186,15 +1186,15 @@
 
         function scrollToMarker() {
             const container = elements.gridContainer;
-            const markerTop = STATE.markerY;
             const viewportHeight = container.clientHeight;
-            const scrollTop = container.scrollTop;
 
-            if (markerTop < scrollTop + 50) {
-                container.scrollTo({ top: Math.max(0, markerTop - 100), behavior: 'smooth' });
-            } else if (markerTop > scrollTop + viewportHeight - 50) {
-                container.scrollTo({ top: markerTop - viewportHeight + 100, behavior: 'smooth' });
-            }
+            // Center-following scroll (VAM 5.70 style)
+            // Marker always stays at viewport center
+            const targetScroll = STATE.markerY - viewportHeight / 2;
+            container.scrollTo({
+                top: Math.max(0, targetScroll),
+                behavior: 'smooth'
+            });
         }
 
         // ==================================================

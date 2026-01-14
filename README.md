@@ -124,6 +124,10 @@ Commercial use requires a paid license. Contact: info@haasiy.jp
 
 ## Development History
 
+### 2026-01-14: Center-Following Auto-Scroll
+- Auto-scroll now keeps marker at viewport center (VAM 5.70 style)
+- Smoother viewing experience during playback
+
 ### 2026-01-13: Multi-Video Support
 - LRU cache for up to 3 videos (instant switching)
 - Per-video grid settings persistence
