@@ -202,6 +202,51 @@ Override default styles with CSS:
 }
 ```
 
+## Customization
+
+### Auto-Scroll Behavior
+
+The grid auto-scrolls to keep the marker visible during playback. You can customize this in `scrollToMarker()`:
+
+**Center-following (default)** - Marker stays at viewport center:
+```javascript
+function scrollToMarker() {
+    const targetScroll = STATE.markerY - viewportHeight / 2;
+    container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+}
+```
+
+**Edge-trigger** - Only scroll when marker reaches screen edge:
+```javascript
+function scrollToMarker() {
+    const markerTop = STATE.markerY;
+    const scrollTop = container.scrollTop;
+
+    if (markerTop < scrollTop + 50) {
+        container.scrollTo({ top: Math.max(0, markerTop - 100), behavior: 'smooth' });
+    } else if (markerTop > scrollTop + viewportHeight - 50) {
+        container.scrollTo({ top: markerTop - viewportHeight + 100, behavior: 'smooth' });
+    }
+}
+```
+
+**Offset from center** - Marker at top 1/3 of viewport:
+```javascript
+const targetScroll = STATE.markerY - viewportHeight / 3;
+```
+
+### Scroll Frequency
+
+Change how often auto-scroll triggers (default: 500ms):
+
+```javascript
+// In timeupdate event listener
+if (now - lastScrollTime > 500) {  // Change this value (milliseconds)
+    scrollToMarker();
+    lastScrollTime = now;
+}
+```
+
 ## Custom Marker
 
 Replace the default crosshair:
