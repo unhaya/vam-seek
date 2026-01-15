@@ -320,6 +320,16 @@ Access-Control-Allow-Origin: *
 
 Or serve the video and page from the same origin.
 
+## Attribution (Optional)
+
+If you find VAM Seek useful, consider adding a link or mention:
+
+```html
+Powered by <a href="https://github.com/unhaya/vam-seek">VAM Seek</a>
+```
+
+This helps others discover the library. Not required, but appreciated!
+
 ## License
 
 Free for personal, educational, and research use.
