@@ -108,7 +108,7 @@
         constructor(options) {
             this.video = options.video;
             this.container = options.container;
-            this.columns = options.columns || 5;
+            this.columns = options.columns || 3;
             this.secondsPerCell = options.secondsPerCell || 15;
             this.thumbWidth = options.thumbWidth || 160;
             this.thumbHeight = options.thumbHeight || 90;
