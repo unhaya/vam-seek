@@ -164,7 +164,8 @@
                 currentVideoUrl: null,  // Current video URL (like demo's STATE.currentVideoUrl)
                 rebuildTimeoutId: null,  // Debounce for rebuild
                 lastScrollTime: 0,
-                scrollAnimationId: null
+                scrollAnimationId: null,
+                positionTimerId: null  // Independent position update timer (v1.3.1)
             };
 
             this.grid = null;
@@ -232,9 +233,12 @@
         }
 
         _bindEvents() {
-            // Video time update
-            this.video.addEventListener('timeupdate', () => this._onTimeUpdate());
+            // Video time update - now only handles auto-scroll (v1.3.1)
+            this.video.addEventListener('timeupdate', () => this._onTimeUpdateForScroll());
             this.video.addEventListener('loadedmetadata', () => this.rebuild());
+
+            // Independent position timer (16ms = ~60fps) - bypasses timeupdate irregularity (v1.3.1)
+            this._startPositionTimer();
 
             // Grid interactions - Mouse
             this.grid.addEventListener('mousedown', (e) => this._onMouseDown(e));
@@ -393,6 +397,8 @@
             if (this.state.scrollAnimationId) {
                 cancelAnimationFrame(this.state.scrollAnimationId);
             }
+            // Stop position timer (v1.3.1)
+            this._stopPositionTimer();
             // Cleanup all extractor videos
             this._cleanupExtractorVideos();
             // Disconnect resize observer
@@ -966,14 +972,41 @@
         }
 
         // ==========================================
+        // Independent Position Timer (v1.3.1)
+        // Bypasses timeupdate event irregularity for smooth marker movement
+        // ==========================================
+
+        _startPositionTimer() {
+            // Clear any existing timer
+            this._stopPositionTimer();
+
+            // 16ms interval = ~60fps - independent of timeupdate events
+            this.state.positionTimerId = setInterval(() => {
+                // Only update when video is playing and not dragging
+                if (!this.video.paused && !this.state.isDragging && this.state.totalCells > 0) {
+                    const pos = this._calculatePositionFromTime(this.video.currentTime);
+                    this._moveMarkerTo(pos.x, pos.y, true);
+                }
+            }, 16);
+        }
+
+        _stopPositionTimer() {
+            if (this.state.positionTimerId) {
+                clearInterval(this.state.positionTimerId);
+                this.state.positionTimerId = null;
+            }
+        }
+
+        // ==========================================
         // Event Handlers
         // ==========================================
 
-        _onTimeUpdate() {
+        /**
+         * TimeUpdate handler - now only handles auto-scroll (v1.3.1)
+         * Marker position updates are handled by independent timer
+         */
+        _onTimeUpdateForScroll() {
             if (this.state.isDragging) return;
-
-            const pos = this._calculatePositionFromTime(this.video.currentTime);
-            this._moveMarkerTo(pos.x, pos.y, true);
 
             // Auto-scroll with throttling (500ms interval)
             if (this.autoScroll && !this.video.paused) {
