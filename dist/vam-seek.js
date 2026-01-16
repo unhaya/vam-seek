@@ -581,19 +581,33 @@
             const isTaskValid = () => this.state.activeTaskId === taskId && this.state.currentVideoUrl === targetVideoUrl;
 
             try {
-                // Cleanup previous extractor videos
-                this._cleanupExtractorVideos();
+                // Hold old extractor videos for delayed cleanup
+                const oldExtractorVideos = [...this.state.extractorVideos];
+                this.state.extractorVideos = [];
 
                 // Check if task was cancelled
                 if (!isTaskValid()) return;
 
-                // Create parallel extractor videos
+                // Create parallel extractor videos (before cleanup for faster start)
                 const extractorPromises = [];
                 for (let i = 0; i < this.parallelExtractors; i++) {
                     extractorPromises.push(this._createExtractorVideo(targetVideoUrl));
                 }
 
                 const extractorVideos = await Promise.all(extractorPromises);
+
+                // Delayed cleanup of old extractor videos (after new videos are created)
+                if (oldExtractorVideos.length > 0) {
+                    setTimeout(() => {
+                        for (const video of oldExtractorVideos) {
+                            if (video) {
+                                video.pause();
+                                video.src = '';
+                                video.remove();
+                            }
+                        }
+                    }, 0);
+                }
 
                 // Check if task was cancelled during video creation
                 if (!isTaskValid()) {

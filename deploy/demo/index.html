@@ -848,18 +848,24 @@
             const isTaskValid = () => STATE.activeTaskId === taskId && STATE.currentVideoUrl === targetVideoUrl;
 
             try {
-                // 前の動画要素をクリーンアップ
-                if (STATE.frameExtractorVideo) {
-                    STATE.frameExtractorVideo.pause();
-                    STATE.frameExtractorVideo.src = '';
-                    STATE.frameExtractorVideo.remove();
-                    STATE.frameExtractorVideo = null;
-                }
+                // 古いExtractorVideoを保持（後でクリーンアップ）
+                const oldExtractorVideo = STATE.frameExtractorVideo;
+                STATE.frameExtractorVideo = null;
 
                 // タスク中断チェック
                 if (!isTaskValid()) return;
 
+                // 新しいExtractorVideoを先に作成（クリーンアップより優先）
                 STATE.frameExtractorVideo = await createExtractorVideo(targetVideoUrl);
+
+                // 古いExtractorVideoを遅延クリーンアップ（新しいビデオ作成後）
+                if (oldExtractorVideo) {
+                    setTimeout(() => {
+                        oldExtractorVideo.pause();
+                        oldExtractorVideo.src = '';
+                        oldExtractorVideo.remove();
+                    }, 0);
+                }
 
                 // 動画ロード後に再度チェック
                 if (!isTaskValid() || !STATE.frameExtractorVideo) {
