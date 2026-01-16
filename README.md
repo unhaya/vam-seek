@@ -132,6 +132,17 @@ For commercial licensing inquiries: haasiy@gmail.com
 
 ## Development History
 
+### 2026-01-17: v1.3.1
+- Fixed slow frame extraction when loading 2nd video
+  - **Cause**: Synchronous cleanup of old ExtractorVideo (`video.src = ''`) blocked new video element creation
+  - **Fix**: Deferred cleanup using `setTimeout`, creating new videos before destroying old ones
+- Fixed mobile video playback (video only played while pressing button)
+  - **Cause**: Touch event `preventDefault()` intercepting video control touches
+  - **Fix**: Check touch target before calling `preventDefault()`
+- Fixed autoscroll oscillation when switching scroll modes
+  - **Cause**: Direct property assignment during ongoing scroll animations
+  - **Fix**: Added `setScrollMode()` method that cancels animations before switching
+
 ### 2026-01-16: v1.3.0
 - Expanded cache: 5 videos, unlimited frames per video
 - Blob URL thumbnails (reduced memory usage)
