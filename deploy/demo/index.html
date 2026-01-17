@@ -456,9 +456,9 @@
         <div class="grid-panel" id="gridPanel">
             <div class="grid-header">
                 <button type="button" class="grid-toggle" id="gridToggle" title="Toggle Grid Panel" tabindex="-1">◀</button>
-                <span class="grid-title">Thumbnail Grid</span>
+                <span class="grid-title">Grid</span>
                 <div class="grid-settings">
-                    <span class="grid-label">Cols:</span>
+                    <span class="grid-label">Col</span>
                     <select class="grid-select" id="columnsSelect" tabindex="-1">
                         <option value="3" selected>3</option>
                         <option value="4">4</option>
@@ -466,15 +466,20 @@
                         <option value="6">6</option>
                         <option value="8">8</option>
                     </select>
-                    <span class="grid-label">Sec/Cell:</span>
+                    <span class="grid-label">Sec</span>
                     <select class="grid-select" id="intervalSelect" tabindex="-1">
-                        <option value="5">5s</option>
-                        <option value="10" selected>10s</option>
-                        <option value="15">15s</option>
-                        <option value="30">30s</option>
-                        <option value="60">1m</option>
+                        <option value="5">5</option>
+                        <option value="10" selected>10</option>
+                        <option value="15">15</option>
+                        <option value="30">30</option>
+                        <option value="60">60</option>
                     </select>
-                    <button type="button" class="btn btn-primary" id="regenerateBtn" disabled tabindex="-1">Generate</button>
+                    <span class="grid-label">Scroll</span>
+                    <select class="grid-select" id="scrollSelect" tabindex="-1">
+                        <option value="center" selected>Center</option>
+                        <option value="edge">Edge</option>
+                        <option value="off">OFF</option>
+                    </select>
                 </div>
             </div>
             <div class="grid-container" id="gridContainer">
@@ -626,7 +631,7 @@
             playerPlaceholder: $('playerPlaceholder'),
             columnsSelect: $('columnsSelect'),
             intervalSelect: $('intervalSelect'),
-            regenerateBtn: $('regenerateBtn'),
+            scrollSelect: $('scrollSelect'),
             gridContainer: $('gridContainer'),
             thumbnailGrid: $('thumbnailGrid'),
             svgMarker: $('svgMarker'),
@@ -745,7 +750,6 @@
             elements.videoPlayer.load();
             elements.videoPlayer.classList.add('visible');
             elements.playerPlaceholder.style.display = 'none';
-            elements.regenerateBtn.disabled = false;
 
             // [2025-01-13] 動画切り替え時にグリッドのスクロール位置を先頭にリセット
             elements.gridContainer.scrollTop = 0;
@@ -1195,9 +1199,36 @@
         let scrollAnimationId = null;
 
         function scrollToMarker() {
+            const scrollMode = elements.scrollSelect.value;
+
+            // OFF mode: no auto-scroll
+            if (scrollMode === 'off') return;
+
             const container = elements.gridContainer;
             const viewportHeight = container.clientHeight;
-            const targetScroll = Math.max(0, STATE.markerY - viewportHeight / 2);
+            let targetScroll;
+
+            if (scrollMode === 'edge') {
+                // Edge mode: only scroll when marker reaches screen edge
+                const currentScroll = container.scrollTop;
+                const markerInView = STATE.markerY - currentScroll;
+                const margin = STATE.cellHeight || 50;
+
+                if (markerInView < margin) {
+                    // Marker above viewport - scroll up
+                    targetScroll = Math.max(0, STATE.markerY - margin);
+                } else if (markerInView > viewportHeight - margin) {
+                    // Marker below viewport - scroll down
+                    targetScroll = STATE.markerY - viewportHeight + margin;
+                } else {
+                    // Marker is within viewport - no scroll
+                    return;
+                }
+            } else {
+                // Center mode (default): marker stays at viewport center
+                targetScroll = Math.max(0, STATE.markerY - viewportHeight / 2);
+            }
+
             const start = container.scrollTop;
             const distance = targetScroll - start;
 
@@ -1339,7 +1370,6 @@
             });
 
             // Grid settings
-            elements.regenerateBtn.addEventListener('click', generateThumbnails);
             elements.columnsSelect.addEventListener('change', () => {
                 if (STATE.currentVideoUrl) generateThumbnails();
             });
