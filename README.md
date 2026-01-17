@@ -132,9 +132,9 @@ For commercial licensing inquiries: haasiy@gmail.com
 
 ## Development History
 
-### 2026-01-18: v1.3.3
-- Fixed center-scroll oscillation during playback (`_scrollToMarker` now uses current position instead of target)
-- Fixed scroll oscillation when switching videos (`rebuild()` cancels ongoing animations)
+### 2026-01-18: v1.3.4
+- Fixed scroll oscillation when switching videos (proper cleanup of event listeners in `destroy()`)
+- Fixed center-scroll oscillation during playback (`_scrollToMarker` uses current position)
 
 ### 2026-01-17: v1.3.1
 - Faster 2nd video loading (deferred ExtractorVideo cleanup)

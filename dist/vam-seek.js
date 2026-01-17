@@ -233,41 +233,52 @@
         }
 
         _bindEvents() {
+            // Store bound event handlers for cleanup in destroy()
+            this._boundHandlers = {
+                onTimeUpdate: () => this._onTimeUpdateForScroll(),
+                onLoadedMetadata: () => this.rebuild(),
+                onMouseDown: (e) => this._onMouseDown(e),
+                onMouseMove: (e) => this._onMouseMove(e),
+                onMouseUp: () => this._onMouseUp(),
+                onTouchStart: (e) => {
+                    e.preventDefault();
+                    this.state.isDragging = true;
+                    this._handleMousePosition(e.touches[0]);
+                },
+                onTouchMove: (e) => {
+                    if (this.state.isDragging) {
+                        e.preventDefault();
+                        this._handleMousePosition(e.touches[0]);
+                    }
+                },
+                onTouchEnd: () => {
+                    if (this.state.isDragging) {
+                        this.state.isDragging = false;
+                        this._scrollToMarker();
+                    }
+                },
+                onKeyDown: (e) => this._onKeyDown(e)
+            };
+
             // Video time update - now only handles auto-scroll (v1.3.1)
-            this.video.addEventListener('timeupdate', () => this._onTimeUpdateForScroll());
-            this.video.addEventListener('loadedmetadata', () => this.rebuild());
+            this.video.addEventListener('timeupdate', this._boundHandlers.onTimeUpdate);
+            this.video.addEventListener('loadedmetadata', this._boundHandlers.onLoadedMetadata);
 
             // Independent position timer (16ms = ~60fps) - bypasses timeupdate irregularity (v1.3.1)
             this._startPositionTimer();
 
             // Grid interactions - Mouse
-            this.grid.addEventListener('mousedown', (e) => this._onMouseDown(e));
-            document.addEventListener('mousemove', (e) => this._onMouseMove(e));
-            document.addEventListener('mouseup', () => this._onMouseUp());
+            this.grid.addEventListener('mousedown', this._boundHandlers.onMouseDown);
+            document.addEventListener('mousemove', this._boundHandlers.onMouseMove);
+            document.addEventListener('mouseup', this._boundHandlers.onMouseUp);
 
             // Grid interactions - Touch (same as demo)
-            this.grid.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.state.isDragging = true;
-                this._handleMousePosition(e.touches[0]);
-            }, { passive: false });
-
-            this.grid.addEventListener('touchmove', (e) => {
-                if (this.state.isDragging) {
-                    e.preventDefault();
-                    this._handleMousePosition(e.touches[0]);
-                }
-            }, { passive: false });
-
-            this.grid.addEventListener('touchend', () => {
-                if (this.state.isDragging) {
-                    this.state.isDragging = false;
-                    this._scrollToMarker();
-                }
-            });
+            this.grid.addEventListener('touchstart', this._boundHandlers.onTouchStart, { passive: false });
+            this.grid.addEventListener('touchmove', this._boundHandlers.onTouchMove, { passive: false });
+            this.grid.addEventListener('touchend', this._boundHandlers.onTouchEnd);
 
             // Keyboard
-            document.addEventListener('keydown', (e) => this._onKeyDown(e));
+            document.addEventListener('keydown', this._boundHandlers.onKeyDown);
 
             // Resize observer - update grid dimensions when container size changes
             this.resizeObserver = new ResizeObserver(() => {
@@ -441,6 +452,18 @@
                 this.resizeObserver.disconnect();
                 this.resizeObserver = null;
             }
+
+            // Remove all event listeners (v1.3.4 - fix video switch oscillation)
+            if (this._boundHandlers) {
+                this.video.removeEventListener('timeupdate', this._boundHandlers.onTimeUpdate);
+                this.video.removeEventListener('loadedmetadata', this._boundHandlers.onLoadedMetadata);
+                document.removeEventListener('mousemove', this._boundHandlers.onMouseMove);
+                document.removeEventListener('mouseup', this._boundHandlers.onMouseUp);
+                document.removeEventListener('keydown', this._boundHandlers.onKeyDown);
+                // Grid event listeners are removed when grid is removed from DOM
+                this._boundHandlers = null;
+            }
+
             // Don't clear global cache on destroy
             this.grid.remove();
             this.marker.remove();
@@ -1266,7 +1289,7 @@
         /**
          * Library version
          */
-        version: '1.3.3'
+        version: '1.3.4'
     };
 
 })(typeof window !== 'undefined' ? window : this);
