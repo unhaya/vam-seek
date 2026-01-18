@@ -69,7 +69,7 @@ vam.destroy();                // Clean up
 ## Features
 
 - Client-side frame extraction (Canvas API, no server)
-- Multi-video LRU cache (5 videos, unlimited frames)
+- Multi-video LRU cache (5 videos, max 500 frames each)
 - Blob URL thumbnails (memory efficient)
 - 60fps marker animation
 - No globals, multiple instances, clean destroy
@@ -132,10 +132,13 @@ For commercial licensing inquiries: haasiy@gmail.com
 
 ## Changelog
 
-**Current: v1.3.4**
+**Current: v1.3.5**
+
+### v1.3.5 (2026-01-18)
+- Frame cache limit: max 500 frames per video (memory optimization)
 
 ### v1.3.x (2026-01-18)
-- Multi-video LRU cache (5 videos, unlimited frames)
+- Multi-video LRU cache (5 videos)
 - Mobile touch support
 - Auto-scroll modes (center/edge/off)
 - Added minified version: `vam-seek.min.js` (~20KB)

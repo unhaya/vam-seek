@@ -22,13 +22,15 @@
     'use strict';
 
     // ==========================================
-    // Multi-Video LRU Cache Manager (up to 5 videos, unlimited frames per video)
+    // Multi-Video LRU Cache Manager (up to 5 videos, max 500 frames per video)
     // ==========================================
     class MultiVideoCache {
-        constructor(maxVideos = 5) {
+        constructor(maxVideos = 5, maxFramesPerVideo = 500) {
             this.maxVideos = maxVideos;
+            this.maxFramesPerVideo = maxFramesPerVideo;
             this.videoOrder = []; // LRU order
             this.caches = new Map(); // videoSrc -> FrameCache (Map)
+            this.frameOrder = new Map(); // videoSrc -> Array of timestamp keys (LRU order)
         }
 
         _getOrCreateCache(videoSrc) {
@@ -46,8 +48,10 @@
                         }
                     }
                     this.caches.delete(oldest);
+                    this.frameOrder.delete(oldest);
                 }
                 this.caches.set(videoSrc, new Map());
+                this.frameOrder.set(videoSrc, []);
                 this.videoOrder.push(videoSrc);
             } else {
                 // Move to end (most recently used)
@@ -70,14 +74,33 @@
         put(videoSrc, timestamp, imageData) {
             const cache = this._getOrCreateCache(videoSrc);
             const key = timestamp.toFixed(2);
+            const order = this.frameOrder.get(videoSrc);
+
             if (cache.has(key)) {
                 // Revoke old blob URL before replacing
                 const old = cache.get(key);
                 if (old && old.blobUrl) {
                     URL.revokeObjectURL(old.blobUrl);
                 }
+                // Move key to end of order (most recently used)
+                const idx = order.indexOf(key);
+                if (idx !== -1) {
+                    order.splice(idx, 1);
+                }
+            } else {
+                // Evict oldest frames if at capacity
+                while (order.length >= this.maxFramesPerVideo) {
+                    const oldestKey = order.shift();
+                    const oldFrame = cache.get(oldestKey);
+                    if (oldFrame && oldFrame.blobUrl) {
+                        URL.revokeObjectURL(oldFrame.blobUrl);
+                    }
+                    cache.delete(oldestKey);
+                }
             }
+
             cache.set(key, imageData);
+            order.push(key);
         }
 
         hasVideo(videoSrc) {
@@ -98,6 +121,7 @@
                 }
             }
             this.caches.clear();
+            this.frameOrder.clear();
             this.videoOrder = [];
         }
 
@@ -1289,7 +1313,7 @@
         /**
          * Library version
          */
-        version: '1.3.4'
+        version: '1.3.5'
     };
 
 })(typeof window !== 'undefined' ? window : this);
