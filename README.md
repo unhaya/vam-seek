@@ -146,7 +146,7 @@ For commercial licensing inquiries: haasiy@gmail.com
 
 ## Examples
 
-- [VAM Seek × AI](https://github.com/unhaya/vam-seek-electron-demo) - Electron desktop app with Claude Vision integration. One grid image, one API call, full video understanding.
+- [VAM Seek × AI](https://github.com/unhaya/vam-seek-electron-demo) - Desktop app with AI video analysis. One grid image, one API call, full video understanding.
 
 ## Credits
 
