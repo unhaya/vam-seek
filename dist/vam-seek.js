@@ -1,7 +1,7 @@
 /**
  * VAM Seek - 2D Video Seek Marker Library
  *
- * @version 1.3.0
+ * @version 1.3.5
  * @license MIT
  * @author VAM Project
  *
@@ -179,6 +179,8 @@
                 markerY: 0,
                 targetX: 0,
                 targetY: 0,
+                currentCellX: 0,  // Current cell column (for keyboard navigation)
+                currentCellY: 0,  // Current cell row (for keyboard navigation)
                 isDragging: false,
                 isAnimating: false,
                 animationId: null,
@@ -418,6 +420,10 @@
                 row = Math.floor(lastIndex / this.columns);
                 col = lastIndex % this.columns;
             }
+
+            // Update internal cell state (for keyboard navigation)
+            this.state.currentCellX = col;
+            this.state.currentCellY = row;
 
             // Calculate cell center position (gap-aware, same as demo)
             const gap = this.state.gridGap || 2;
@@ -942,6 +948,9 @@
             this.state.markerY = this.state.cellHeight / 2;
             this.state.targetX = this.state.markerX;
             this.state.targetY = this.state.markerY;
+            // Initialize internal cell state
+            this.state.currentCellX = 0;
+            this.state.currentCellY = 0;
             this._updateMarkerPosition();
         }
 
@@ -1130,6 +1139,12 @@
                 if (!this.video.paused && !this.state.isDragging && this.state.totalCells > 0) {
                     const pos = this._calculatePositionFromTime(this.video.currentTime);
                     this._moveMarkerTo(pos.x, pos.y, true);
+                    // Sync internal cell state during playback
+                    const gap = this.state.gridGap || 2;
+                    const cellPlusGapX = this.state.cellWidth + gap;
+                    const cellPlusGapY = this.state.cellHeight + gap;
+                    this.state.currentCellX = Math.max(0, Math.min(Math.floor(pos.x / cellPlusGapX), this.columns - 1));
+                    this.state.currentCellY = Math.max(0, Math.min(Math.floor(pos.y / cellPlusGapY), this.state.rows - 1));
                 }
             }, 16);
         }
@@ -1178,11 +1193,17 @@
                 this.state.isDragging = false;
                 // Snap marker Y position to cell center (keep X position as is)
                 const gap = this.state.gridGap || 2;
+                const cellPlusGapX = this.state.cellWidth + gap;
                 const cellPlusGapY = this.state.cellHeight + gap;
+                const xAdjusted = this.state.markerX - this.state.cellWidth / 2;
                 const yAdjusted = this.state.markerY - this.state.cellHeight / 2;
+                const col = Math.max(0, Math.min(Math.round(xAdjusted / cellPlusGapX), this.columns - 1));
                 const row = Math.max(0, Math.min(Math.round(yAdjusted / cellPlusGapY), this.state.rows - 1));
                 const snappedY = row * cellPlusGapY + this.state.cellHeight / 2;
                 this._moveMarkerTo(this.state.markerX, snappedY, true);
+                // Update internal cell state
+                this.state.currentCellX = col;
+                this.state.currentCellY = row;
                 this._scrollToMarker();
             }
         }
@@ -1209,9 +1230,9 @@
         _onKeyDown(e) {
             if (!this.video.duration) return;
 
-            const cell = this.getCurrentCell();
-            let col = cell.col;
-            let row = cell.row;
+            // Use internal state instead of getCurrentCell() to avoid video.currentTime sync issues
+            let col = this.state.currentCellX;
+            let row = this.state.currentCellY;
 
             switch (e.key) {
                 case 'ArrowLeft':
