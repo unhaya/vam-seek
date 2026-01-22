@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAM-RGB: Causal Teleportation - Technical White Paper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 16px;
+            line-height: 1.8;
+            color: #1a1a2e;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 40px;
+            background: #fff;
+        }
+        h1 {
+            font-size: 48px;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .tagline {
+            text-align: center;
+            font-size: 24px;
+            color: #666;
+            margin-bottom: 48px;
+            font-style: italic;
+        }
+        .hero-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 16px;
+            margin-bottom: 48px;
+            text-align: center;
+        }
+        .hero-box h2 {
+            font-size: 28px;
+            margin-bottom: 16px;
+        }
+        .hero-box p {
+            font-size: 18px;
+            opacity: 0.95;
+        }
+        h2 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-top: 48px;
+            margin-bottom: 24px;
+            color: #1a1a2e;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 8px;
+        }
+        h3 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 16px;
+            color: #333;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444;
+        }
+        .highlight {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            padding: 24px;
+            border-radius: 12px;
+            margin: 24px 0;
+        }
+        .code-block {
+            background: #1a1a2e;
+            color: #a8d8ea;
+            padding: 24px;
+            border-radius: 12px;
+            margin: 24px 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 24px 0;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 16px;
+            border-bottom: 1px solid #eee;
+        }
+        tr:nth-child(even) {
+            background: #f8f9ff;
+        }
+        .channel-table td:first-child {
+            font-weight: 700;
+        }
+        .red { color: #e74c3c; }
+        .green { color: #27ae60; }
+        .blue { color: #3498db; }
+        ul, ol {
+            margin: 16px 0 16px 32px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .insight-box {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 24px;
+            margin: 24px 0;
+            border-radius: 0 12px 12px 0;
+        }
+        .insight-box h4 {
+            color: #667eea;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+        .paradigm-shift {
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 16px;
+            margin: 32px 0;
+        }
+        .paradigm-shift h3 {
+            color: #f093fb;
+            margin-top: 0;
+        }
+        .paradigm-shift p {
+            color: #ccc;
+        }
+        .formula {
+            font-family: 'Times New Roman', serif;
+            font-size: 20px;
+            text-align: center;
+            padding: 24px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+        .cta-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 48px;
+            border-radius: 16px;
+            text-align: center;
+            margin-top: 48px;
+        }
+        .cta-section h2 {
+            color: white;
+            border: none;
+            margin-top: 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 16px 32px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 700;
+            margin: 8px;
+            transition: transform 0.2s;
+        }
+        .cta-button:hover {
+            transform: scale(1.05);
+        }
+        .footer {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        @media print {
+            body {
+                background: white;
+            }
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>VAM-RGB</h1>
+        <p class="tagline">Causal Teleportation: Sending Time Through Color</p>
+
+        <div class="hero-box">
+            <h2>What if AI could see the future and the past in a single glance?</h2>
+            <p>VAM-RGB encodes temporal causality into RGB channels, enabling AI to perceive motion without video streaming.</p>
+        </div>
+
+        <h2>The Problem: AI is Temporally Blind</h2>
+        <p>Current multimodal AI models process images frame by frame. They see <strong>snapshots</strong>, not <strong>stories</strong>. To understand motion, they need multiple images and explicit prompts about temporal relationships.</p>
+
+        <div class="highlight">
+            <strong>The bottleneck:</strong> Sending 30 frames per second to an AI API is expensive, slow, and wasteful. Most of that data is redundant.
+        </div>
+
+        <h2>The Solution: Causal Teleportation</h2>
+        <p>VAM-RGB "teleports" causality across time by encoding <strong>three moments</strong> into a single RGB image:</p>
+
+        <table class="channel-table">
+            <tr>
+                <th>Channel</th>
+                <th>Time</th>
+                <th>Meaning</th>
+            </tr>
+            <tr>
+                <td class="red">R (Red)</td>
+                <td>T - 0.5s</td>
+                <td>The Past (where things were)</td>
+            </tr>
+            <tr>
+                <td class="green">G (Green)</td>
+                <td>T</td>
+                <td>The Present (where things are)</td>
+            </tr>
+            <tr>
+                <td class="blue">B (Blue)</td>
+                <td>T + 0.5s</td>
+                <td>The Future (where things will be)</td>
+            </tr>
+        </table>
+
+        <h3>How It Works</h3>
+        <div class="code-block">
+<pre>
+// Causal Teleportation Algorithm
+function teleportCausality(video, T0, deltaT = 0.5) {
+    // Extract three temporal moments
+    const past    = getFrame(video, T0 - deltaT);
+    const present = getFrame(video, T0);
+    const future  = getFrame(video, T0 + deltaT);
+
+    // Convert to luminance (grayscale)
+    const R = toLuminance(past);
+    const G = toLuminance(present);
+    const B = toLuminance(future);
+
+    // Merge into single RGB image
+    return mergeChannels(R, G, B);
+}
+</pre>
+        </div>
+
+        <h2>The Magic: Reading Ghosts as Signals</h2>
+
+        <div class="paradigm-shift">
+            <h3>A Paradigm Shift in Image Processing</h3>
+            <p>In traditional video processing, motion blur and ghosting are <strong>noise to be eliminated</strong>.</p>
+            <p>In VAM-RGB, they are <strong>signals to be decoded</strong>.</p>
+            <p style="color: #f093fb; font-weight: bold; font-size: 20px; margin-top: 16px;">We turned artifacts into information.</p>
+        </div>
+
+        <h3>Decoding the Chromatic Aberration</h3>
+        <table>
+            <tr>
+                <th>Visual Pattern</th>
+                <th>Interpretation</th>
+            </tr>
+            <tr>
+                <td>Grayscale (R = G = B)</td>
+                <td>Static object - no motion</td>
+            </tr>
+            <tr>
+                <td>Red fringe on left, blue on right</td>
+                <td>Object moving right</td>
+            </tr>
+            <tr>
+                <td>Blue fringe on left, red on right</td>
+                <td>Object moving left</td>
+            </tr>
+            <tr>
+                <td>Wide color separation</td>
+                <td>Fast motion</td>
+            </tr>
+            <tr>
+                <td>Narrow color separation</td>
+                <td>Slow motion</td>
+            </tr>
+        </table>
+
+        <div class="insight-box">
+            <h4>Why "Teleportation"?</h4>
+            <p>Because we're not just compressing data - we're <strong>transmitting causality</strong>. The image carries information about what <em>caused</em> the current state (past) and what it will <em>cause</em> (future). AI can now reason about temporal relationships from a single static image.</p>
+        </div>
+
+        <h2>The Math: Information Density</h2>
+
+        <div class="formula">
+            Compression Ratio = 3:1 (three frames → one image)
+        </div>
+
+        <p>But it's not just about compression. It's about <strong>semantic density</strong>:</p>
+
+        <ul>
+            <li><strong>Traditional:</strong> 1 image = 1 moment = no temporal context</li>
+            <li><strong>VAM-RGB:</strong> 1 image = 3 moments = full causal context</li>
+        </ul>
+
+        <div class="highlight">
+            <strong>Result:</strong> AI can infer motion vectors, predict trajectories, and understand scene dynamics - all from a single API call.
+        </div>
+
+        <h2>Applications: Where Causal Teleportation Matters</h2>
+
+        <h3>1. Video Understanding for LLMs</h3>
+        <p>Send a single VAM-RGB grid image to GPT-4V, Claude, or Gemini. Ask: "When does the car start moving?" The AI can now answer by reading the chromatic aberration.</p>
+
+        <h3>2. Autonomous Systems</h3>
+        <p>Self-driving cars can use VAM-RGB to compress temporal sensor data for onboard AI inference, reducing bandwidth and latency.</p>
+
+        <h3>3. Surveillance & Security</h3>
+        <p>A single VAM-RGB frame captures motion events that would otherwise require video playback to detect.</p>
+
+        <h3>4. Sports Analytics</h3>
+        <p>Coaches can see player movement patterns encoded in color - no video scrubbing required.</p>
+
+        <h2>Implementation</h2>
+
+        <div class="code-block">
+<pre>
+// Browser implementation (Canvas API)
+async function createVAMRGB(video, timestamp, deltaT = 0.5) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Capture three frames
+    const frames = await Promise.all([
+        captureFrame(video, timestamp - deltaT),
+        captureFrame(video, timestamp),
+        captureFrame(video, timestamp + deltaT)
+    ]);
+
+    // Get image data
+    const imageData = ctx.createImageData(canvas.width, canvas.height);
+
+    for (let i = 0; i < frames[0].data.length; i += 4) {
+        // R channel = past luminance
+        imageData.data[i] = getLuminance(frames[0], i);
+        // G channel = present luminance
+        imageData.data[i + 1] = getLuminance(frames[1], i);
+        // B channel = future luminance
+        imageData.data[i + 2] = getLuminance(frames[2], i);
+        // Alpha = full opacity
+        imageData.data[i + 3] = 255;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL('image/png');
+}
+
+function getLuminance(frame, i) {
+    // Rec.709 luminance
+    return 0.2126 * frame.data[i]
+         + 0.7152 * frame.data[i + 1]
+         + 0.0722 * frame.data[i + 2];
+}
+</pre>
+        </div>
+
+        <h2>The Philosophy: Noise → Signal</h2>
+
+        <p>VAM-RGB embodies a deeper principle:</p>
+
+        <div class="paradigm-shift">
+            <h3>Every "artifact" is information in disguise.</h3>
+            <p>Motion blur isn't noise - it's a record of displacement.</p>
+            <p>Ghosting isn't corruption - it's temporal superposition.</p>
+            <p>The question isn't "how do we remove it?" but "what is it telling us?"</p>
+        </div>
+
+        <div class="cta-section">
+            <h2>Try It Now</h2>
+            <p>Open source. No server required. Works in your browser.</p>
+            <a href="https://github.com/unhaya/vam-seek-ai" class="cta-button">View on GitHub</a>
+            <a href="https://haasiy.main.jp/vam_web/deploy/demo/index.html" class="cta-button">Live Demo</a>
+        </div>
+
+        <div class="footer">
+            <p><strong>VAM-RGB: Causal Teleportation</strong></p>
+            <p>Created by Susumu Takahashi (haasiy / unhaya)</p>
+            <p>January 2026</p>
+            <p style="margin-top: 16px;">
+                <strong>Formal Documentation:</strong> For patent specification and technical details, see
+                <a href="VAM-RGB-Patent-Specification.pdf">VAM-RGB Patent Specification (PDF)</a>
+            </p>
+            <p style="margin-top: 16px; font-size: 12px; color: #999;">
+                This document uses "Causal Teleportation" as a conceptual metaphor for the technical process
+                formally known as "Time-Series RGB Synthesis" (時系列RGB合成).
+            </p>
+        </div>
+    </div>
+</body>
+</html>
