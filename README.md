@@ -168,7 +168,7 @@ Motion appears as chromatic aberration. Static objects remain grayscale. Moving 
 
 AI perceives temporal flow from a single image—no video streaming required.
 
-- [VAM Seek AI](https://github.com/unhaya/vam-seek-ai) - Implementation
+- [VAM Seek AI](https://github.com/unhaya/vam-seek-ai) - The Evolution
 - [VAM-RGB Defensive Publication (Zenodo)](https://zenodo.org/records/18338870) - Technical specification
 
 ## Credits
