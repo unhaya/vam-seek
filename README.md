@@ -1,5 +1,9 @@
 # VAM Seek - 2D Video Seek Marker
 
+**Visual Array Matrix Seeker** — A JavaScript library for 2D video navigation.
+
+**Author:** Susumu Takahashi ([unhaya](https://github.com/unhaya) / [haasiy](https://github.com/haasiy))
+
 **A 2D visual seek grid for videos.**
 **Navigate any video by scenes, not timestamps.**
 **Client-side only. Zero server cost. Zero privacy risk.**
