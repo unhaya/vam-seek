@@ -1,37 +1,55 @@
-VAM Seek - Dual License
+VAM Seek - License
+==================
 
-Copyright (c) 2025 VAM Seek
+Copyright (c) 2026 Susumu Takahashi (unhaya)
+https://github.com/unhaya
 
-================================================================================
-NON-COMMERCIAL LICENSE
-================================================================================
+This license is based on CC BY-NC 4.0, adapted for software.
 
-This software is free to use for:
-- Personal projects
-- Educational purposes
-- Academic research
-- Non-profit organizations
 
-Under the following conditions:
-1. You may not use this software for commercial purposes
-2. You must retain this copyright notice in all copies
-3. You must not claim this software as your own work
+1. Purpose & Ownership
+----------------------
+This software is a personal project shared with the community during
+public beta. All rights remain with the original author (unhaya).
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 
-================================================================================
-COMMERCIAL LICENSE
-================================================================================
+2. Permitted Use (Go Wild!)
+---------------------------
+You are free to:
 
-For commercial use, including but not limited to:
-- Use in commercial products or services
-- Use in applications that generate revenue
-- Use by for-profit companies
+- USE: Run the software for personal, educational, or research purposes
+- MODIFY: Change the code for your own use
+- SHARE: Share the original with proper attribution
+- LEARN: Study the code, write about it, teach with it
 
-A commercial license is required.
+Attribution format: "Created by unhaya - https://github.com/unhaya"
 
-Contact: info@haasiy.jp
 
-================================================================================
+3. Restrictions (The Red Line)
+------------------------------
+You may NOT:
+
+- SELL: Sell this software or derivatives
+- MONETIZE: Use in any commercial product or service
+- REBRAND: Remove attribution or claim as your own work
+- CLOSE: Create proprietary/closed-source derivatives
+
+
+4. Commercial Licensing
+-----------------------
+Want to use this commercially? Let's talk.
+
+Contact: haasiy@gmail.com
+
+I'm open to partnerships that respect the spirit of this project.
+
+
+5. Disclaimer
+-------------
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+USE AT YOUR OWN RISK.
+
+---
+
+TL;DR: Use it, learn from it, share it. Just don't sell it or claim
+it's yours. Want to go commercial? Email me.

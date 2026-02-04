@@ -1,9 +1,9 @@
 /**
  * VAM Seek - 2D Video Seek Marker Library
  *
- * @version 1.3.5
- * @license MIT
- * @author VAM Project
+ * @version 1.3.6
+ * @license See LICENSE (CC BY-NC 4.0 based)
+ * @author Susumu Takahashi (unhaya) - https://github.com/unhaya
  *
  * Usage:
  *   <script src="https://your-domain.com/vam-seek.js"></script>
@@ -1334,7 +1334,7 @@
         /**
          * Library version
          */
-        version: '1.3.5'
+        version: '1.3.6'
     };
 
 })(typeof window !== 'undefined' ? window : this);
