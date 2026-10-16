@@ -1,5 +1,20 @@
 # VAM Seek - 2D Video Seek Marker
 
+> ## 🎬 Just want to use VAM Seek? Try it in your browser — no install, no coding.
+>
+> [![Try VAM Seek in your browser](https://img.shields.io/badge/▶_Try_VAM_Seek_in_your_browser-Free_Demo-ff6b6b?style=for-the-badge)](https://vamseek.greenleaf-planning.com/demo/)
+>
+> Open a folder of your own videos and browse them as a scene grid. Your videos stay on your PC — nothing is uploaded.
+> Demo limits: only the first 30 minutes of each video; saving clips and moving or deleting files are not available. Use Chrome or Edge on a PC.
+>
+> **Like it?** The full app is available on the Microsoft Store, with a free 30-day trial.
+>
+> <a href="https://apps.microsoft.com/detail/9NM7JZQRP3Q6"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get it from Microsoft"></a>
+>
+> **About this repository:** the code here is the original open-source library (v1.4.0). VAM Seek has since grown into a Windows app with scene-based grids, clip export and more. The app is developed separately, and its source code is not published here.
+
+---
+
 **Visual Array Matrix Seeker** — A JavaScript library for 2D video navigation.
 
 **Author:** Susumu Takahashi ([unhaya](https://github.com/unhaya) / [haasiy](https://github.com/haasiy))
@@ -12,7 +27,7 @@
 [![No Dependencies](https://img.shields.io/badge/Dependencies-None-brightgreen.svg)](#)
 [![Browser](https://img.shields.io/badge/Works%20in-All%20Modern%20Browsers-orange.svg)](#)
 
-[![Try Live Demo](https://img.shields.io/badge/🎬_Try_Live_Demo-Click_Here-ff6b6b?style=for-the-badge)](https://haasiy.main.jp/vam_web/deploy/demo/index.html)
+[![Library Demo](https://img.shields.io/badge/Library_Demo-for_developers-555?style=for-the-badge)](https://haasiy.main.jp/vam_web/deploy/demo/index.html)
 
 https://github.com/user-attachments/assets/395ff2ec-0372-465c-9e42-500c138eb7aa
 
